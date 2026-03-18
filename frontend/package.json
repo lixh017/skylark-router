@@ -8,11 +8,11 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
-    "tauri:build:mac:dmg": "tauri build --bundles dmg",
-    "tauri:build:mac:universal:dmg": "tauri build --target universal-apple-darwin --bundles dmg"
+    "tauri": "npx tauri",
+    "tauri:dev": "npx tauri dev",
+    "tauri:build": "npx tauri build",
+    "tauri:build:mac:dmg": "npx tauri build --bundles dmg",
+    "tauri:build:mac:universal:dmg": "npx tauri build --target universal-apple-darwin --bundles dmg"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

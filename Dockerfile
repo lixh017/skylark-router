@@ -7,7 +7,7 @@ COPY frontend/ .
 RUN npm run build
 
 # ---- Stage 2: Build backend (with embedded frontend) ----
-FROM golang:1.22-alpine AS backend-build
+FROM golang:1.26-alpine AS backend-build
 WORKDIR /app/backend
 ARG VERSION=dev
 ARG GIT_COMMIT=unknown
