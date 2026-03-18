@@ -1,0 +1,29 @@
+# Build outputs
+dist/
+skylark-router
+skylark-router.exe
+backend/static/assets
+backend/static/index.html
+frontend/dist
+
+# Tauri
+frontend/src-tauri/target/
+frontend/src-tauri/binaries/
+
+# Database
+*.db
+*.db-journal
+
+# Config (may contain tokens — copy config.yaml.example instead)
+config.yaml
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Go
+backend/vendor/
+
+# Misc
+.env
+.DS_Store

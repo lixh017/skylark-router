@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Default capability for Skylark Router desktop app","local":true,"windows":["main"],"permissions":["core:default",{"identifier":"shell:allow-execute","allow":[{"name":"skylark-router","sidecar":true}]},"shell:allow-spawn","shell:allow-kill","core:tray:default","autostart:default"]}}

@@ -1,0 +1,16 @@
+# Skylark Router Configuration
+# Changes take effect on restart.
+
+# Port to listen on
+port: "8080"
+
+# Path to the SQLite database file
+# Relative paths are resolved from the binary's directory
+db_path: "skylark-router.db"
+
+# Admin token to protect the dashboard (/api/* routes)
+# Leave empty to disable authentication (not recommended in production)
+auth_token: ""
+
+# Set to true to log full request/response bodies (for debugging)
+log_requests: false
