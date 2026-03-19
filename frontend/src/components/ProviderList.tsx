@@ -3,6 +3,10 @@ import type { Provider, Model } from "../types";
 import { listProviders, deleteProvider, testProvider, listModels } from "../api/client";
 import ProviderForm from "./ProviderForm";
 import { useI18n } from "../i18n";
+import { useToast } from "./ui/Toast";
+import { useConfirm } from "./ui/ConfirmModal";
+import { SkeletonTable } from "./ui/Skeleton";
+import { EmptyState } from "./ui/EmptyState";
 
 interface TestState {
   open: boolean;
@@ -13,23 +17,35 @@ interface TestState {
 
 export default function ProviderList() {
   const { t } = useI18n();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [allModels, setAllModels] = useState<Model[]>([]);
   const [editing, setEditing] = useState<Provider | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [testStates, setTestStates] = useState<Record<number, TestState>>({});
+  const [loading, setLoading] = useState(true);
 
   const load = () => {
-    listProviders().then(setProviders).catch(console.error);
-    listModels().then(setAllModels).catch(console.error);
+    setLoading(true);
+    Promise.all([listProviders(), listModels()])
+      .then(([p, m]) => { setProviders(p); setAllModels(m); })
+      .catch(console.error)
+      .finally(() => setLoading(false));
   };
 
   useEffect(load, []);
 
   const handleDelete = async (id: number) => {
-    if (!confirm(t.deleteProviderConfirm)) return;
-    await deleteProvider(id);
-    load();
+    const ok = await confirm({ title: t.deleteProviderConfirm, message: "此操作无法撤销，provider 下的路由也会一并移除。", confirmLabel: t.delete, danger: true });
+    if (!ok) return;
+    try {
+      await deleteProvider(id);
+      toast("Provider 已删除", "success");
+      load();
+    } catch (e) {
+      toast("删除失败：" + (e as Error).message, "error");
+    }
   };
 
   const getProviderModels = (providerId: number) =>
@@ -77,12 +93,21 @@ export default function ProviderList() {
       {showForm && (
         <ProviderForm
           provider={editing}
-          onSaved={() => { setShowForm(false); setEditing(null); load(); }}
+          onSaved={() => { setShowForm(false); setEditing(null); load(); toast(editing ? "Provider 已更新" : "Provider 已添加", "success"); }}
           onCancel={() => { setShowForm(false); setEditing(null); }}
         />
       )}
 
-      <table style={tableStyle}>
+      {loading ? (
+        <SkeletonTable rows={3} cols={6} />
+      ) : providers.length === 0 ? (
+        <EmptyState
+          title="还没有添加任何 Provider"
+          description="添加 OpenAI、Anthropic 或其他兼容服务商，开始路由你的 LLM 请求。"
+          action={{ label: t.addProvider, onClick: () => { setEditing(null); setShowForm(true); } }}
+        />
+      ) : (
+        <table style={tableStyle}>
         <thead>
           <tr>
             <th style={thStyle}>{t.name}</th>
@@ -232,6 +257,7 @@ export default function ProviderList() {
           )}
         </tbody>
       </table>
+      )}
     </div>
   );
 }

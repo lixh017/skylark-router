@@ -2,9 +2,15 @@ import { useState, useEffect, useCallback } from "react";
 import type { APIKey } from "../types";
 import { listAPIKeys, createAPIKey, updateAPIKey, deleteAPIKey, resetAPIKeyQuota } from "../api/client";
 import { useI18n } from "../i18n";
+import { useToast } from "./ui/Toast";
+import { useConfirm } from "./ui/ConfirmModal";
+import { SkeletonTable } from "./ui/Skeleton";
+import { EmptyState } from "./ui/EmptyState";
 
 export default function APIKeyList() {
   const { t } = useI18n();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [keys, setKeys] = useState<APIKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [newKeyName, setNewKeyName] = useState("");
@@ -34,7 +40,7 @@ export default function APIKeyList() {
       setNewKeyName("");
       load();
     } catch (e) {
-      alert(t.failedCreateKey + (e as Error).message);
+      toast(t.failedCreateKey + (e as Error).message, "error");
     }
   };
 
@@ -43,7 +49,7 @@ export default function APIKeyList() {
       await updateAPIKey(key.id, { enabled: !key.enabled });
       load();
     } catch (e) {
-      alert(t.failedUpdateKey + (e as Error).message);
+      toast(t.failedUpdateKey + (e as Error).message, "error");
     }
   };
 
@@ -62,33 +68,38 @@ export default function APIKeyList() {
         quota_total: editQuotaTotal,
       });
       setEditingId(null);
+      toast("API Key 已更新", "success");
       load();
     } catch (e) {
-      alert(t.failedUpdateKey + (e as Error).message);
+      toast(t.failedUpdateKey + (e as Error).message, "error");
     }
   };
 
   const handleResetQuota = async (id: number) => {
-    if (!confirm(t.resetQuotaConfirm)) return;
+    const ok = await confirm({ title: t.resetQuotaConfirm, message: "已使用的 token 配额将被清零。", confirmLabel: "重置", danger: false });
+    if (!ok) return;
     try {
       await resetAPIKeyQuota(id);
+      toast("配额已重置", "success");
       load();
     } catch (e) {
-      alert(t.failedResetQuota + (e as Error).message);
+      toast(t.failedResetQuota + (e as Error).message, "error");
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm(t.deleteKeyConfirm)) return;
+    const ok = await confirm({ title: t.deleteKeyConfirm, message: "此 API Key 将永久失效。", confirmLabel: t.delete, danger: true });
+    if (!ok) return;
     try {
       await deleteAPIKey(id);
+      toast("API Key 已删除", "success");
       load();
     } catch (e) {
-      alert(t.failedDeleteKey + (e as Error).message);
+      toast(t.failedDeleteKey + (e as Error).message, "error");
     }
   };
 
-  if (loading) return <p>{t.loading}</p>;
+  if (loading) return <SkeletonTable rows={3} cols={7} />;
 
   return (
     <div>
@@ -132,7 +143,10 @@ export default function APIKeyList() {
       )}
 
       {keys.length === 0 ? (
-        <p style={{ color: "var(--text-muted)" }}>{t.noKeysConfigured}</p>
+        <EmptyState
+          title="还没有创建 API Key"
+          description="创建 API Key 来控制哪些应用可以访问你的路由，并设置限流和配额。"
+        />
       ) : (
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>

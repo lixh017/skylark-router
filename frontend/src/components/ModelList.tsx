@@ -2,6 +2,8 @@ import { useEffect, useState, useMemo } from "react";
 import type { Model, Provider } from "../types";
 import { listModels, deleteModel, listProviders } from "../api/client";
 import ModelForm from "./ModelForm";
+import { useToast } from "./ui/Toast";
+import { useConfirm } from "./ui/ConfirmModal";
 import { useI18n } from "../i18n";
 
 interface ModelGroup {
@@ -321,6 +323,8 @@ console.log(response.choices[0].message.content);`,
 
 export default function ModelList() {
   const { t } = useI18n();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [models, setModels] = useState<Model[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [editing, setEditing] = useState<Model | null>(null);
@@ -352,9 +356,15 @@ export default function ModelList() {
   }, [models]);
 
   const handleDelete = async (id: number) => {
-    if (!confirm(t.deleteModelConfirm)) return;
-    await deleteModel(id);
-    load();
+    const ok = await confirm({ title: t.deleteModelConfirm, message: "此路由将被永久移除。", confirmLabel: t.delete, danger: true });
+    if (!ok) return;
+    try {
+      await deleteModel(id);
+      toast("模型路由已删除", "success");
+      load();
+    } catch (e) {
+      toast("删除失败：" + (e as Error).message, "error");
+    }
   };
 
   const toggleGroup = (name: string) => {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { getConfig, updateConfig, restartSidecar, type AppConfig, type ConfigUpdateRequest } from "../api/client";
 import { useI18n } from "../i18n";
+import { Skeleton } from "./ui/Skeleton";
 
 const isTauri = () => typeof window !== "undefined" && !!window.__TAURI_INTERNALS__;
 
@@ -95,7 +96,11 @@ export default function SettingsPage() {
     }
   };
 
-  if (!config) return <div style={{ padding: 20, color: "var(--text-muted)" }}>{t.loading}</div>;
+  if (!config) return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: 4 }}>
+      {[0,1,2,3].map(i => <Skeleton key={i} height={48} radius={8} />)}
+    </div>
+  );
 
   return (
     <div style={{ maxWidth: 560 }}>

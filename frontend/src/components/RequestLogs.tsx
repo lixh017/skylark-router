@@ -2,9 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import type { RequestLog } from "../types";
 import { listRequestLogs, getRequestLog, deleteRequestLogs } from "../api/client";
 import { useI18n } from "../i18n";
+import { useToast } from "./ui/Toast";
+import { SkeletonTable } from "./ui/Skeleton";
+import { EmptyState } from "./ui/EmptyState";
 
 export default function RequestLogs() {
   const { t } = useI18n();
+  const toast = useToast();
   const [logs, setLogs] = useState<RequestLog[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -44,7 +48,7 @@ export default function RequestLogs() {
       setExpandedId(id);
       setExpandedLog(log);
     } catch (e) {
-      alert(t.failedLoadLogDetail + (e as Error).message);
+      toast(t.failedLoadLogDetail + (e as Error).message, "error");
     }
   };
 
@@ -56,10 +60,10 @@ export default function RequestLogs() {
     const before = new Date(Date.now() - d * 86400000).toISOString();
     try {
       const result = await deleteRequestLogs(before);
-      alert(t.deletedLogs(result.deleted));
+      toast(t.deletedLogs(result.deleted), "success");
       load();
     } catch (e) {
-      alert(t.failedDeleteLogs + (e as Error).message);
+      toast(t.failedDeleteLogs + (e as Error).message, "error");
     }
   };
 
@@ -82,9 +86,9 @@ export default function RequestLogs() {
       </div>
 
       {loading ? (
-        <p>{t.loading}</p>
+        <SkeletonTable rows={5} cols={7} />
       ) : logs.length === 0 ? (
-        <p style={{ color: "var(--text-muted)" }}>{t.noLogsFound}</p>
+        <EmptyState title="暂无请求记录" description="开始向路由发送请求后，日志将显示在这里。" />
       ) : (
         <>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Stats } from "../types";
 import { getStats, getTimeseries, type TimeseriesPoint } from "../api/client";
 import { useI18n } from "../i18n";
+import { SkeletonCard, Skeleton } from "./ui/Skeleton";
 
 export default function UsageStats() {
   const { t } = useI18n();
@@ -19,7 +20,17 @@ export default function UsageStats() {
 
   useEffect(load, [timeRange]);
 
-  if (!stats) return <div>{t.loading}</div>;
+  if (!stats) return (
+    <div>
+      <Skeleton height={28} width={200} style={{ marginBottom: 24 }} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+        {[0,1,2,3].map(i => <SkeletonCard key={i} />)}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+        {[0,1,2].map(i => <SkeletonCard key={i} />)}
+      </div>
+    </div>
+  );
 
   const successRate = stats.total_requests > 0
     ? ((stats.success_requests / stats.total_requests) * 100).toFixed(1)
