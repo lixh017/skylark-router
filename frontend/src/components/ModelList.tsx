@@ -2,9 +2,12 @@ import { useEffect, useState, useMemo } from "react";
 import type { Model, Provider } from "../types";
 import { listModels, deleteModel, listProviders } from "../api/client";
 import ModelForm from "./ModelForm";
+import { Drawer } from "./ui/Drawer";
 import { useToast } from "./ui/Toast";
 import { useConfirm } from "./ui/ConfirmModal";
 import { useI18n } from "../i18n";
+import { Skeleton } from "./ui/Skeleton";
+import { EmptyState } from "./ui/EmptyState";
 
 interface ModelGroup {
   name: string;
@@ -328,19 +331,27 @@ export default function ModelList() {
   const [models, setModels] = useState<Model[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [editing, setEditing] = useState<Model | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [showUsage, setShowUsage] = useState<Record<string, boolean>>({});
   const [capTab, setCapTab] = useState<Record<string, CapTab>>({});
   const [langTab, setLangTab] = useState<Record<string, LangTab>>({});
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const load = () => {
-    listModels().then(setModels).catch(console.error);
-    listProviders().then(setProviders).catch(console.error);
+    setLoading(true);
+    Promise.all([listModels(), listProviders()])
+      .then(([m, p]) => { setModels(m); setProviders(p); })
+      .catch(console.error)
+      .finally(() => setLoading(false));
   };
 
   useEffect(load, []);
+
+  const openAdd = () => { setEditing(null); setDrawerOpen(true); };
+  const openEdit = (m: Model) => { setEditing(m); setDrawerOpen(true); };
+  const closeDrawer = () => { setDrawerOpen(false); setEditing(null); };
 
   const groups = useMemo<ModelGroup[]>(() => {
     const map = new Map<string, Model[]>();
@@ -389,22 +400,28 @@ export default function ModelList() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h2 style={{ margin: 0 }}>{t.modelMappings}</h2>
-        <button onClick={() => { setEditing(null); setShowForm(true); }} style={btnStyle}>
+        <button onClick={openAdd} style={btnStyle}>
           {t.addModel}
         </button>
       </div>
 
-      {showForm && (
-        <ModelForm
-          model={editing}
-          providers={providers}
-          onSaved={() => { setShowForm(false); setEditing(null); load(); }}
-          onCancel={() => { setShowForm(false); setEditing(null); }}
+      {loading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {[0, 1, 2].map((i) => (
+            <div key={i} style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+              <div style={{ padding: "14px 16px", background: "var(--surface)", display: "flex", gap: 12, alignItems: "center" }}>
+                <Skeleton width={180} height={18} />
+                <Skeleton width={60} height={20} radius={12} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : groups.length === 0 ? (
+        <EmptyState
+          title="还没有配置模型路由"
+          description="添加模型路由，将虚拟模型名称映射到具体的 Provider 和模型。"
+          action={{ label: t.addModel, onClick: openAdd }}
         />
-      )}
-
-      {groups.length === 0 ? (
-        <div style={{ textAlign: "center", color: "var(--text-muted)", padding: 40 }}>{t.noModelsYet}</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {groups.map((group) => {
@@ -441,7 +458,7 @@ export default function ModelList() {
                       {t.usageExample}
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); setEditing(null); setShowForm(true); }}
+                      onClick={(e) => { e.stopPropagation(); openAdd(); }}
                       style={addRouteBtnStyle}
                     >
                       {t.addRoute}
@@ -526,7 +543,7 @@ export default function ModelList() {
                             </span>
                           </td>
                           <td style={tdStyle}>
-                            <button onClick={() => { setEditing(m); setShowForm(true); }} style={linkBtn}>{t.edit}</button>
+                            <button onClick={() => openEdit(m)} style={linkBtn}>{t.edit}</button>
                             <button onClick={() => handleDelete(m.id)} style={{ ...linkBtn, color: "var(--danger)" }}>{t.delete}</button>
                           </td>
                         </tr>
@@ -539,6 +556,21 @@ export default function ModelList() {
           })}
         </div>
       )}
+
+      {/* Drawer */}
+      <Drawer
+        open={drawerOpen}
+        onClose={closeDrawer}
+        title={editing ? t.editModelMapping : t.addModel}
+        width={560}
+      >
+        <ModelForm
+          model={editing}
+          providers={providers}
+          onSaved={() => { closeDrawer(); load(); toast(editing ? "模型路由已更新" : "模型路由已添加", "success"); }}
+          onCancel={closeDrawer}
+        />
+      </Drawer>
     </div>
   );
 }

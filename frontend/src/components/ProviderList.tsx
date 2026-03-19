@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import type { Provider, Model } from "../types";
 import { listProviders, deleteProvider, testProvider, listModels } from "../api/client";
 import ProviderForm from "./ProviderForm";
+import { Drawer } from "./ui/Drawer";
 import { useI18n } from "../i18n";
 import { useToast } from "./ui/Toast";
 import { useConfirm } from "./ui/ConfirmModal";
-import { SkeletonTable } from "./ui/Skeleton";
+import { SkeletonCard } from "./ui/Skeleton";
 import { EmptyState } from "./ui/EmptyState";
 
 interface TestState {
@@ -22,7 +23,7 @@ export default function ProviderList() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [allModels, setAllModels] = useState<Model[]>([]);
   const [editing, setEditing] = useState<Provider | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [testStates, setTestStates] = useState<Record<number, TestState>>({});
   const [loading, setLoading] = useState(true);
 
@@ -48,6 +49,10 @@ export default function ProviderList() {
     }
   };
 
+  const openAdd = () => { setEditing(null); setDrawerOpen(true); };
+  const openEdit = (p: Provider) => { setEditing(p); setDrawerOpen(true); };
+  const closeDrawer = () => { setDrawerOpen(false); setEditing(null); };
+
   const getProviderModels = (providerId: number) =>
     allModels.filter((m) => m.provider_id === providerId && m.enabled);
 
@@ -59,10 +64,7 @@ export default function ProviderList() {
 
   const toggleTest = (p: Provider) => {
     const cur = testStates[p.id];
-    if (cur?.open) {
-      patchTest(p.id, { open: false });
-      return;
-    }
+    if (cur?.open) { patchTest(p.id, { open: false }); return; }
     const models = getProviderModels(p.id);
     patchTest(p.id, { open: true, result: null, modelName: models[0]?.name ?? "" });
   };
@@ -83,198 +85,218 @@ export default function ProviderList() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <h2 style={{ margin: 0 }}>{t.providers}</h2>
-        <button onClick={() => { setEditing(null); setShowForm(true); }} style={btnStyle}>
-          {t.addProvider}
-        </button>
+        <button onClick={openAdd} style={btnPrimary}>{t.addProvider}</button>
       </div>
 
-      {showForm && (
-        <ProviderForm
-          provider={editing}
-          onSaved={() => { setShowForm(false); setEditing(null); load(); toast(editing ? "Provider 已更新" : "Provider 已添加", "success"); }}
-          onCancel={() => { setShowForm(false); setEditing(null); }}
-        />
-      )}
-
+      {/* Content */}
       {loading ? (
-        <SkeletonTable rows={3} cols={6} />
+        <div style={gridStyle}>
+          {[0, 1, 2].map((i) => <SkeletonCard key={i} />)}
+        </div>
       ) : providers.length === 0 ? (
         <EmptyState
           title="还没有添加任何 Provider"
           description="添加 OpenAI、Anthropic 或其他兼容服务商，开始路由你的 LLM 请求。"
-          action={{ label: t.addProvider, onClick: () => { setEditing(null); setShowForm(true); } }}
+          action={{ label: t.addProvider, onClick: openAdd }}
         />
       ) : (
-        <table style={tableStyle}>
-        <thead>
-          <tr>
-            <th style={thStyle}>{t.name}</th>
-            <th style={thStyle}>{t.protocol}</th>
-            <th style={thStyle}>{t.baseUrl}</th>
-            <th style={thStyle}>{t.apiKey}</th>
-            <th style={thStyle}>{t.enabled}</th>
-            <th style={thStyle}>{t.actions}</th>
-          </tr>
-        </thead>
-        <tbody>
+        <div style={gridStyle}>
           {providers.map((p) => {
             const ts = testStates[p.id];
             const pModels = getProviderModels(p.id);
+            const modelCount = allModels.filter((m) => m.provider_id === p.id).length;
+
             return (
-              <>
-                <tr key={p.id}>
-                  <td style={tdStyle}><strong style={{ fontSize: 14 }}>{p.name}</strong></td>
-                  <td style={tdStyle}>
+              <div key={p.id} style={cardStyle}>
+                {/* Card header */}
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                    {/* Status dot */}
                     <span style={{
-                      padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600,
-                      background: p.protocol === "anthropic" ? "var(--warning-bg)" : "var(--accent-bg)",
-                      color: p.protocol === "anthropic" ? "var(--warning-text)" : "var(--accent)",
-                    }}>
-                      {p.protocol === "anthropic" ? "Anthropic" : "OpenAI"}
+                      width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                      background: p.enabled ? "var(--success)" : "var(--text-muted)",
+                      boxShadow: p.enabled ? "0 0 0 2px var(--success-bg)" : "none",
+                    }} />
+                    <span style={{ fontWeight: 600, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {p.name}
                     </span>
-                  </td>
-                  <td style={{ ...tdStyle, color: "var(--text-secondary)", fontSize: 13 }}>{p.base_url}</td>
-                  <td style={tdStyle}>
-                    <code style={{ fontSize: 12 }}>{p.api_key.slice(0, 6)}···{p.api_key.slice(-4)}</code>
-                  </td>
-                  <td style={tdStyle}>
-                    <span style={{
-                      display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13,
-                      color: p.enabled ? "var(--success-text)" : "var(--danger-text)",
-                    }}>
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor", display: "inline-block" }} />
-                      {p.enabled ? t.yes : t.no}
-                    </span>
-                  </td>
-                  <td style={tdStyle}>
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                      <button onClick={() => toggleTest(p)} style={{
-                        ...linkBtn,
-                        color: ts?.open ? "var(--accent)" : "var(--text-secondary)",
-                        fontWeight: ts?.open ? 600 : 400,
-                      }}>
-                        Test
-                      </button>
-                      <button onClick={() => { setEditing(p); setShowForm(true); }} style={linkBtn}>
-                        {t.edit}
-                      </button>
-                      <button onClick={() => handleDelete(p.id)} style={{ ...linkBtn, color: "var(--danger)" }}>
-                        {t.delete}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                  </div>
+                  {/* Protocol badge */}
+                  <span style={{
+                    padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, flexShrink: 0, marginLeft: 8,
+                    background: p.protocol === "anthropic" ? "var(--warning-bg)" : "var(--accent-bg)",
+                    color: p.protocol === "anthropic" ? "var(--warning-text)" : "var(--accent)",
+                  }}>
+                    {p.protocol === "anthropic" ? "Anthropic" : "OpenAI"}
+                  </span>
+                </div>
 
-                {/* Test panel row */}
+                {/* Base URL */}
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {p.base_url}
+                </div>
+
+                {/* Meta row */}
+                <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+                  <div style={metaItem}>
+                    <span style={metaLabel}>API Key</span>
+                    <code style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                      {p.api_key ? `${p.api_key.slice(0, 5)}···${p.api_key.slice(-3)}` : "—"}
+                    </code>
+                  </div>
+                  <div style={metaItem}>
+                    <span style={metaLabel}>Models</span>
+                    <span style={{ fontSize: 13, fontWeight: 500 }}>{modelCount}</span>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: "flex", gap: 6, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+                  <button
+                    onClick={() => toggleTest(p)}
+                    style={{
+                      ...actionBtn,
+                      background: ts?.open ? "var(--accent-bg)" : "var(--surface-2)",
+                      color: ts?.open ? "var(--accent)" : "var(--text-secondary)",
+                      border: ts?.open ? "1px solid var(--accent)" : "1px solid var(--border)",
+                    }}
+                  >
+                    Test
+                  </button>
+                  <button onClick={() => openEdit(p)} style={actionBtn}>{t.edit}</button>
+                  <button onClick={() => handleDelete(p.id)} style={{ ...actionBtn, color: "var(--danger)", borderColor: "transparent" }}>
+                    {t.delete}
+                  </button>
+                </div>
+
+                {/* Test panel */}
                 {ts?.open && (
-                  <tr key={`${p.id}-test`}>
-                    <td colSpan={6} style={{ padding: "0 12px 14px", borderBottom: "1px solid var(--border)" }}>
-                      <div style={{
-                        background: "var(--surface-2)", border: "1px solid var(--border)",
-                        borderRadius: 10, padding: "14px 16px",
-                        display: "flex", flexDirection: "column", gap: 10,
-                      }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                          Test connection — {p.name}
-                        </div>
+                  <div style={{
+                    marginTop: 12, padding: "12px 14px", borderRadius: 8,
+                    background: "var(--surface-2)", border: "1px solid var(--border)",
+                  }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>
+                      Test Connection
+                    </div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      {pModels.length > 0 ? (
+                        <>
+                          <select
+                            value={ts.modelName}
+                            onChange={(e) => patchTest(p.id, { modelName: e.target.value, result: null })}
+                            style={selectStyle}
+                          >
+                            {pModels.map((m) => (
+                              <option key={m.id} value={m.name}>{m.name}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => runTest(p)}
+                            disabled={ts.loading}
+                            style={{
+                              padding: "6px 14px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 500, cursor: ts.loading ? "not-allowed" : "pointer",
+                              background: ts.loading ? "var(--surface-hover)" : "var(--accent)",
+                              color: ts.loading ? "var(--text-muted)" : "var(--accent-text)",
+                            }}
+                          >
+                            {ts.loading ? "Testing…" : "Run"}
+                          </button>
+                        </>
+                      ) : (
+                        <span style={{ fontSize: 12, color: "var(--warning-text)" }}>先在 Models 页添加模型</span>
+                      )}
+                    </div>
 
-                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                          {pModels.length > 0 ? (
-                            <>
-                              <select
-                                value={ts.modelName}
-                                onChange={(e) => patchTest(p.id, { modelName: e.target.value, result: null })}
-                                style={{ padding: "6px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg)", fontSize: 13, minWidth: 180 }}
-                              >
-                                {pModels.map((m) => (
-                                  <option key={m.id} value={m.name}>
-                                    {m.name} → {m.provider_model}
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                onClick={() => runTest(p)}
-                                disabled={ts.loading}
-                                style={{
-                                  padding: "6px 16px", borderRadius: 7, border: "none",
-                                  background: ts.loading ? "var(--surface-hover)" : "var(--accent)",
-                                  color: ts.loading ? "var(--text-muted)" : "var(--accent-text)",
-                                  cursor: ts.loading ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 500,
-                                }}
-                              >
-                                {ts.loading ? "Testing…" : "Run Test"}
-                              </button>
-                            </>
-                          ) : (
-                            <span style={{ fontSize: 13, color: "var(--warning-text)" }}>
-                              ⚠ No models mapped to this provider yet. Add a model in the Models tab first.
-                            </span>
+                    {ts.result && (
+                      <div style={{
+                        marginTop: 10, padding: "8px 12px", borderRadius: 6, display: "flex", gap: 8, alignItems: "flex-start",
+                        background: ts.result.ok ? "var(--success-bg)" : "var(--danger-bg)",
+                        border: `1px solid ${ts.result.ok ? "var(--success)" : "var(--danger)"}`,
+                      }}>
+                        <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0 }}>{ts.result.ok ? "✓" : "✗"}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: ts.result.ok ? "var(--success-text)" : "var(--danger-text)" }}>
+                            {ts.result.ok ? `Connected · ${ts.result.latency_ms}ms` : "Failed"}
+                          </div>
+                          {ts.result.preview && (
+                            <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 3, fontStyle: "italic" }}>
+                              "{ts.result.preview}"
+                            </div>
+                          )}
+                          {ts.result.error && (
+                            <div style={{ fontSize: 11, color: "var(--danger-text)", marginTop: 3, wordBreak: "break-word" }}>
+                              {ts.result.error}
+                            </div>
                           )}
                         </div>
-
-                        {/* Result */}
-                        {ts.result && (
-                          <div style={{
-                            display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px",
-                            borderRadius: 8, background: ts.result.ok ? "var(--success-bg)" : "var(--danger-bg)",
-                            border: `1px solid ${ts.result.ok ? "var(--success)" : "var(--danger)"}`,
-                            flexWrap: "wrap",
-                          }}>
-                            <span style={{ fontSize: 18, lineHeight: 1 }}>{ts.result.ok ? "✓" : "✗"}</span>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontWeight: 600, fontSize: 13, color: ts.result.ok ? "var(--success-text)" : "var(--danger-text)" }}>
-                                {ts.result.ok ? `Connected · ${ts.result.latency_ms} ms` : "Connection failed"}
-                              </div>
-                              {ts.result.model_used && (
-                                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                                  {ts.result.model_used}
-                                </div>
-                              )}
-                              {ts.result.preview && (
-                                <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4, fontStyle: "italic" }}>
-                                  "{ts.result.preview}"
-                                </div>
-                              )}
-                              {ts.result.error && (
-                                <div style={{ fontSize: 12, color: "var(--danger-text)", marginTop: 4, wordBreak: "break-word" }}>
-                                  {ts.result.error}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
                       </div>
-                    </td>
-                  </tr>
+                    )}
+                  </div>
                 )}
-              </>
+              </div>
             );
           })}
-          {providers.length === 0 && (
-            <tr><td colSpan={6} style={{ ...tdStyle, textAlign: "center", color: "var(--text-muted)", padding: "32px 12px" }}>{t.noProvidersYet}</td></tr>
-          )}
-        </tbody>
-      </table>
+        </div>
       )}
+
+      {/* Drawer */}
+      <Drawer
+        open={drawerOpen}
+        onClose={closeDrawer}
+        title={editing ? t.editProvider : t.addProviderTitle}
+        width={560}
+      >
+        <ProviderForm
+          provider={editing}
+          onSaved={() => {
+            closeDrawer();
+            load();
+            toast(editing ? "Provider 已更新" : "Provider 已添加", "success");
+          }}
+          onCancel={closeDrawer}
+        />
+      </Drawer>
     </div>
   );
 }
 
-const btnStyle: React.CSSProperties = {
+const gridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+  gap: 16,
+};
+
+const cardStyle: React.CSSProperties = {
+  background: "var(--surface)",
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  padding: "16px",
+  transition: "box-shadow 0.15s",
+};
+
+const metaItem: React.CSSProperties = {
+  display: "flex", flexDirection: "column", gap: 2,
+};
+
+const metaLabel: React.CSSProperties = {
+  fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600,
+};
+
+const actionBtn: React.CSSProperties = {
+  padding: "5px 12px", borderRadius: 6, border: "1px solid var(--border)",
+  background: "var(--surface-2)", color: "var(--text-secondary)",
+  cursor: "pointer", fontSize: 12, fontWeight: 500,
+};
+
+const selectStyle: React.CSSProperties = {
+  padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)",
+  background: "var(--bg)", color: "var(--text)", fontSize: 12, flex: 1, minWidth: 0,
+};
+
+const btnPrimary: React.CSSProperties = {
   padding: "8px 16px", background: "var(--accent)", color: "var(--accent-text)",
   border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 500,
-};
-const linkBtn: React.CSSProperties = {
-  background: "none", border: "none", color: "var(--accent)",
-  cursor: "pointer", fontSize: 13, padding: "2px 0",
-};
-const tableStyle: React.CSSProperties = { width: "100%", borderCollapse: "collapse" };
-const thStyle: React.CSSProperties = {
-  textAlign: "left", padding: "10px 12px", borderBottom: "2px solid var(--border)",
-  fontSize: 12, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em",
-};
-const tdStyle: React.CSSProperties = {
-  padding: "12px 12px", borderBottom: "1px solid var(--border)", fontSize: 14, verticalAlign: "middle",
 };
