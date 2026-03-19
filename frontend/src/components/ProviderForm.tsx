@@ -200,7 +200,10 @@ export default function ProviderForm({ provider, onSaved, onCancel }: Props) {
   const [saving, setSaving] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [categoryTab, setCategoryTab] = useState<"global" | "china" | "local">("global");
-  const [noKeyRequired, setNoKeyRequired] = useState(provider ? false : false);
+  const [noKeyRequired, setNoKeyRequired] = useState(() => {
+    if (!provider) return false;
+    return PRESETS.some((p) => p.noKey && provider.base_url.startsWith(p.baseUrl.replace(/\/v1\/?$/, "")));
+  });
 
   const applyPreset = (preset: ProviderPreset) => {
     setName(preset.name);
@@ -316,11 +319,17 @@ export default function ProviderForm({ provider, onSaved, onCancel }: Props) {
           onChange={(e) => setApiKey(e.target.value)}
           placeholder={noKeyRequired ? "Not required" : t.providerKeyPlaceholder}
           required={!noKeyRequired}
-          style={inputStyle}
+          disabled={noKeyRequired}
+          style={{ ...inputStyle, opacity: noKeyRequired ? 0.5 : 1 }}
         />
-        {noKeyRequired && (
-          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>No API key needed for this provider.</div>
-        )}
+        <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, cursor: "pointer", fontSize: 12, color: "var(--text-muted)" }}>
+          <input
+            type="checkbox"
+            checked={noKeyRequired}
+            onChange={(e) => { setNoKeyRequired(e.target.checked); if (e.target.checked) setApiKey(""); }}
+          />
+          No API key required (e.g. Ollama)
+        </label>
       </div>
       <div style={fieldStyle}>
         <label>{t.protocol}</label>
