@@ -129,9 +129,9 @@ export default function Chat() {
       modelName: c.modelName, protocol: c.protocol, params: c.params, messages: c.messages,
     }));
     const now = Date.now();
-    setConversations((prev) => {
-      let updated: SavedConv[];
-      setActiveConvId((currentId) => {
+    setActiveConvId((currentId) => {
+      setConversations((prev) => {
+        let updated: SavedConv[];
         if (currentId) {
           updated = prev.map((c) => c.id === currentId ? { ...c, updatedAt: now, columns: colData } : c);
         } else {
@@ -142,10 +142,10 @@ export default function Chat() {
           updated = [nc, ...prev];
           setTimeout(() => setActiveConvId(newId), 0);
         }
-        writeStore(updated);
-        return currentId;
+        writeStore(updated!);
+        return updated!;
       });
-      return updated!;
+      return currentId;
     });
   };
 
