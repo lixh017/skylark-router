@@ -88,15 +88,12 @@ func ChatCompletions(c *gin.Context) {
 		})
 		return
 	}
-	// Fall back to configured default model
+	// Fall back to configured default model, then auto-select any available
 	if req.Model == "" {
 		req.Model = config.C.DefaultModel
 	}
 	if req.Model == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": gin.H{"message": "model is required (or set default_model in config)", "type": "invalid_request_error"},
-		})
-		return
+		req.Model = "auto"
 	}
 
 	// Serialize request body for logging
@@ -197,11 +194,7 @@ func AnthropicMessages(c *gin.Context) {
 		req.Model = config.C.DefaultModel
 	}
 	if req.Model == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"type":  "error",
-			"error": gin.H{"type": "invalid_request_error", "message": "model is required (or set default_model in config)"},
-		})
-		return
+		req.Model = "auto"
 	}
 	if req.MaxTokens == 0 {
 		req.MaxTokens = 4096
