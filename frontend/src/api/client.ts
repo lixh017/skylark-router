@@ -217,6 +217,7 @@ export async function* streamChatAnthropic(req: ChatRequest, signal?: AbortSigna
   };
   if (system) body.system = system;
   if (req.temperature !== undefined) body.temperature = req.temperature;
+  if (req.top_p !== undefined) body.top_p = req.top_p;
 
   const origin = await getBackendOrigin();
   const res = await fetch(`${origin}/v1/messages`, {

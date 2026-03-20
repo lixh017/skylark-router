@@ -10,6 +10,10 @@ interface Params {
   temperature: number;
   maxTokens: number;
   systemPrompt: string;
+  contextLimit: number;   // 0 = unlimited
+  topP: number;           // 0 = don't send
+  frequencyPenalty: number;
+  presencePenalty: number;
 }
 
 interface Column {
@@ -62,7 +66,10 @@ function groupConvs(convs: SavedConv[]) {
 
 let nextId = 1;
 const genId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-const defaultParams = (): Params => ({ temperature: 0.7, maxTokens: 0, systemPrompt: "" });
+const defaultParams = (): Params => ({
+  temperature: 0.7, maxTokens: 0, systemPrompt: "",
+  contextLimit: 0, topP: 0, frequencyPenalty: 0, presencePenalty: 0,
+});
 const makeCol = (name: string): Column => ({
   id: nextId++, modelName: name, protocol: "openai",
   params: defaultParams(), messages: [], isLoading: false,
@@ -219,13 +226,20 @@ export default function Chat() {
     });
 
   const streamCol = async (col: Column, userMessages: ChatMessage[], signal: AbortSignal): Promise<Column> => {
+    // Apply context limit (keep system prompt + last N messages)
+    const limited = col.params.contextLimit > 0
+      ? userMessages.slice(-col.params.contextLimit)
+      : userMessages;
     const req: ChatRequest = {
       model: col.modelName,
       messages: col.params.systemPrompt
-        ? [{ role: "system", content: col.params.systemPrompt }, ...stripOldMedia(userMessages)]
-        : stripOldMedia(userMessages),
+        ? [{ role: "system", content: col.params.systemPrompt }, ...stripOldMedia(limited)]
+        : stripOldMedia(limited),
       temperature: col.params.temperature,
       ...(col.params.maxTokens > 0 && { max_tokens: col.params.maxTokens }),
+      ...(col.params.topP > 0 && { top_p: col.params.topP }),
+      ...(col.params.frequencyPenalty !== 0 && { frequency_penalty: col.params.frequencyPenalty }),
+      ...(col.params.presencePenalty !== 0 && { presence_penalty: col.params.presencePenalty }),
     };
     let content = "";
     try {
@@ -436,12 +450,14 @@ export default function Chat() {
     <div style={{
       position: "absolute", top: "100%", left: 0, zIndex: 50, marginTop: 6,
       background: "var(--surface)", border: "1px solid var(--border)",
-      borderRadius: 10, padding: 14, width: 260,
+      borderRadius: 10, padding: 14, width: 280, maxHeight: 480, overflowY: "auto",
       boxShadow: "var(--shadow-lg)", display: "flex", flexDirection: "column", gap: 10,
     }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
         Model Parameters
       </div>
+
+      {/* Temperature */}
       <label style={labelStyle}>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <span>Temperature</span>
@@ -454,12 +470,63 @@ export default function Chat() {
           <span>Precise 0.0</span><span>Creative 2.0</span>
         </div>
       </label>
+
+      {/* Top P */}
       <label style={labelStyle}>
-        <div>Max tokens <span style={{ color: "var(--text-muted)", fontSize: 11 }}>(0 = default)</span></div>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span>Top P <span style={{ color: "var(--text-muted)", fontSize: 11 }}>(0 = skip)</span></span>
+          <span style={{ color: "var(--accent)", fontVariantNumeric: "tabular-nums" }}>{col.params.topP.toFixed(2)}</span>
+        </div>
+        <input type="range" min={0} max={1} step={0.05} value={col.params.topP}
+          onChange={(e) => patchParams(col.id, { topP: parseFloat(e.target.value) })}
+          style={{ width: "100%", accentColor: "var(--accent)" }} />
+      </label>
+
+      {/* Frequency Penalty */}
+      <label style={labelStyle}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span>Frequency Penalty</span>
+          <span style={{ color: "var(--accent)", fontVariantNumeric: "tabular-nums" }}>{col.params.frequencyPenalty.toFixed(1)}</span>
+        </div>
+        <input type="range" min={-2} max={2} step={0.1} value={col.params.frequencyPenalty}
+          onChange={(e) => patchParams(col.id, { frequencyPenalty: parseFloat(e.target.value) })}
+          style={{ width: "100%", accentColor: "var(--accent)" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+          <span>-2.0</span><span>+2.0</span>
+        </div>
+      </label>
+
+      {/* Presence Penalty */}
+      <label style={labelStyle}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span>Presence Penalty</span>
+          <span style={{ color: "var(--accent)", fontVariantNumeric: "tabular-nums" }}>{col.params.presencePenalty.toFixed(1)}</span>
+        </div>
+        <input type="range" min={-2} max={2} step={0.1} value={col.params.presencePenalty}
+          onChange={(e) => patchParams(col.id, { presencePenalty: parseFloat(e.target.value) })}
+          style={{ width: "100%", accentColor: "var(--accent)" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+          <span>-2.0</span><span>+2.0</span>
+        </div>
+      </label>
+
+      {/* Max tokens */}
+      <label style={labelStyle}>
+        <div>Max tokens <span style={{ color: "var(--text-muted)", fontSize: 11 }}>(0 = model default)</span></div>
         <input type="number" min={0} max={32000} step={256} value={col.params.maxTokens}
           onChange={(e) => patchParams(col.id, { maxTokens: parseInt(e.target.value) || 0 })}
           style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg)", fontSize: 13 }} />
       </label>
+
+      {/* Context limit */}
+      <label style={labelStyle}>
+        <div>Context messages <span style={{ color: "var(--text-muted)", fontSize: 11 }}>(0 = unlimited)</span></div>
+        <input type="number" min={0} max={200} step={2} value={col.params.contextLimit}
+          onChange={(e) => patchParams(col.id, { contextLimit: parseInt(e.target.value) || 0 })}
+          style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg)", fontSize: 13 }} />
+      </label>
+
+      {/* System prompt */}
       <label style={labelStyle}>
         <div>System prompt</div>
         <textarea value={col.params.systemPrompt}
@@ -649,7 +716,9 @@ export default function Chat() {
                     <div style={{ fontSize: 13, fontWeight: 500 }}>{col.modelName}</div>
                     <div style={{ fontSize: 12 }}>
                       T={col.params.temperature.toFixed(1)}
+                      {col.params.topP > 0 ? `  P=${col.params.topP.toFixed(2)}` : ""}
                       {col.params.maxTokens > 0 ? `  max=${col.params.maxTokens}` : ""}
+                      {col.params.contextLimit > 0 ? `  ctx=${col.params.contextLimit}` : ""}
                       {col.params.systemPrompt ? "  [system]" : ""}
                     </div>
                   </div>
