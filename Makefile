@@ -68,14 +68,18 @@ clean:
 # We build both macOS architectures so the correct one is always available
 # regardless of whether Tauri is running natively (arm64) or via Rosetta (x86_64).
 tauri-sidecar:
-	@echo "Building Go sidecar binaries for macOS (amd64 + arm64)…"
+	@echo "Building Go sidecar binaries for macOS (amd64 + arm64 + universal)…"
 	@mkdir -p $(SIDECAR_DIR)
 	cd backend && CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "$(LDFLAGS)" \
 	    -o ../$(SIDECAR_DIR)/skylark-router-x86_64-apple-darwin .
 	cd backend && CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "$(LDFLAGS)" \
 	    -o ../$(SIDECAR_DIR)/skylark-router-aarch64-apple-darwin .
+	lipo -create -output $(SIDECAR_DIR)/skylark-router-universal-apple-darwin \
+	    $(SIDECAR_DIR)/skylark-router-x86_64-apple-darwin \
+	    $(SIDECAR_DIR)/skylark-router-aarch64-apple-darwin
 	@echo "  → $(SIDECAR_DIR)/skylark-router-x86_64-apple-darwin"
 	@echo "  → $(SIDECAR_DIR)/skylark-router-aarch64-apple-darwin"
+	@echo "  → $(SIDECAR_DIR)/skylark-router-universal-apple-darwin (universal)"
 
 # Run Tauri in dev mode (hot-reload frontend + sidecar backend).
 tauri-dev: tauri-sidecar

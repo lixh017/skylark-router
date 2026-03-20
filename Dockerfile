@@ -1,10 +1,11 @@
 # ---- Stage 1: Build frontend ----
-FROM node:20-alpine AS frontend-build
+FROM node:22-alpine AS frontend-build
 WORKDIR /app/frontend
-COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm ci
+RUN npm install -g pnpm@9
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN pnpm install --ignore-scripts
 COPY frontend/ .
-RUN npm run build
+RUN pnpm run build
 
 # ---- Stage 2: Build backend (with embedded frontend) ----
 FROM golang:1.26-alpine AS backend-build

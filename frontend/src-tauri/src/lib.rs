@@ -183,6 +183,7 @@ pub fn run() {
                         app.exit(0);
                     }
                     "show" => {
+                        #[cfg(target_os = "macos")]
                         let _ = app.show();
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.unminimize();
@@ -195,6 +196,7 @@ pub fn run() {
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click { button: MouseButton::Left, .. } = event {
                         let app = tray.app_handle();
+                        #[cfg(target_os = "macos")]
                         let _ = app.show();
                         if let Some(window) = app.get_webview_window("main") {
                             let is_visible = window.is_visible().unwrap_or(false);
