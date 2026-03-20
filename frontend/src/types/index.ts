@@ -69,9 +69,31 @@ export interface ProviderStat {
   cost_usd: number;
 }
 
+export interface ContentPartText {
+  type: "text";
+  text: string;
+}
+
+export interface ContentPartImage {
+  type: "image_url";
+  image_url: { url: string };
+}
+
+export interface ContentPartAudio {
+  type: "input_audio";
+  input_audio: { data: string; format: string };
+}
+
+export interface ContentPartVideo {
+  type: "video_url";
+  video_url: { url: string; mime_type: string };
+}
+
+export type ContentPart = ContentPartText | ContentPartImage | ContentPartAudio | ContentPartVideo;
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: string | ContentPart[];
 }
 
 export interface ChatRequest {

@@ -90,7 +90,7 @@ export default function Playground() {
             <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
               {msg.role === "user" ? t.you : t.assistant}
             </div>
-            {msg.content || (loading && i === messages.length - 1 ? "..." : "")}
+            {(typeof msg.content === "string" ? msg.content : "") || (loading && i === messages.length - 1 ? "..." : "")}
           </div>
         ))}
         <div ref={messagesEnd} />

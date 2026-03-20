@@ -1,4 +1,4 @@
-import type { Provider, Model, Stats, ChatRequest, Protocol, APIKey, RequestLog, RequestLogListResponse } from "../types";
+import type { Provider, Model, Stats, ChatRequest, Protocol, APIKey, RequestLog, RequestLogListResponse, ContentPart } from "../types";
 
 // ---------------------------------------------------------------------------
 // Backend origin resolution
@@ -132,12 +132,13 @@ export const getTimeseries = (since?: string, interval?: string) => {
 };
 
 // Chat - OpenAI format streaming
-export async function* streamChatOpenAI(req: ChatRequest): AsyncGenerator<string> {
+export async function* streamChatOpenAI(req: ChatRequest, signal?: AbortSignal): AsyncGenerator<string> {
   const origin = await getBackendOrigin();
   const res = await fetch(`${origin}/v1/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...req, stream: true }),
+    signal,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
@@ -147,13 +148,60 @@ export async function* streamChatOpenAI(req: ChatRequest): AsyncGenerator<string
 }
 
 // Chat - Anthropic format streaming
-export async function* streamChatAnthropic(req: ChatRequest): AsyncGenerator<string> {
+function extractMimeType(dataUrl: string): string {
+  const match = dataUrl.match(/^data:([^;]+);/);
+  return match ? match[1] : "image/jpeg";
+}
+
+function extractBase64(dataUrl: string): string {
+  return dataUrl.split(",")[1] || "";
+}
+
+function toAnthropicContent(content: string | ContentPart[]): unknown {
+  if (typeof content === "string") return content;
+  return content.map((p) => {
+    if (p.type === "text") return { type: "text", text: p.text };
+    if (p.type === "image_url") {
+      return {
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: extractMimeType(p.image_url.url),
+          data: extractBase64(p.image_url.url),
+        },
+      };
+    }
+    if (p.type === "input_audio") {
+      return {
+        type: "document",
+        source: {
+          type: "base64",
+          media_type: `audio/${p.input_audio.format}`,
+          data: p.input_audio.data,
+        },
+      };
+    }
+    if (p.type === "video_url") {
+      return {
+        type: "video",
+        source: {
+          type: "base64",
+          media_type: p.video_url.mime_type,
+          data: extractBase64(p.video_url.url),
+        },
+      };
+    }
+    return p;
+  });
+}
+
+export async function* streamChatAnthropic(req: ChatRequest, signal?: AbortSignal): AsyncGenerator<string> {
   const messages = req.messages.filter((m) => m.role !== "system");
   const system = req.messages.find((m) => m.role === "system")?.content;
 
   const body: Record<string, unknown> = {
     model: req.model,
-    messages: messages.map((m) => ({ role: m.role, content: m.content })),
+    messages: messages.map((m) => ({ role: m.role, content: toAnthropicContent(m.content) })),
     max_tokens: req.max_tokens || 4096,
     stream: true,
   };
@@ -165,6 +213,7 @@ export async function* streamChatAnthropic(req: ChatRequest): AsyncGenerator<str
     method: "POST",
     headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01" },
     body: JSON.stringify(body),
+    signal,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
@@ -226,12 +275,13 @@ async function* readAnthropicSSE(res: Response): AsyncGenerator<string> {
 // Unified stream function that picks protocol
 export async function* streamChat(
   req: ChatRequest,
-  protocol: Protocol = "openai"
+  protocol: Protocol = "openai",
+  signal?: AbortSignal
 ): AsyncGenerator<string> {
   if (protocol === "anthropic") {
-    yield* streamChatAnthropic(req);
+    yield* streamChatAnthropic(req, signal);
   } else {
-    yield* streamChatOpenAI(req);
+    yield* streamChatOpenAI(req, signal);
   }
 }
 
@@ -257,6 +307,8 @@ export interface AppConfig {
   auth_token: string;
   log_requests: boolean;
   default_model: string;
+  search_provider: string;
+  search_api_key: string;
 }
 
 export interface ConfigUpdateRequest {
@@ -265,6 +317,8 @@ export interface ConfigUpdateRequest {
   auth_token?: string;
   log_requests?: boolean;
   default_model?: string;
+  search_provider?: string;
+  search_api_key?: string;
 }
 
 export interface ConfigUpdateResponse {
@@ -275,6 +329,15 @@ export const getConfig = () => request<AppConfig>("/config");
 
 export const updateConfig = (data: ConfigUpdateRequest) =>
   request<ConfigUpdateResponse>("/config", { method: "PUT", body: JSON.stringify(data) });
+
+export interface WebSearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+export const searchWeb = (q: string) =>
+  request<WebSearchResult[]>(`/search?q=${encodeURIComponent(q)}`);
 
 export async function restartSidecar(): Promise<number> {
   const { invoke } = await import("@tauri-apps/api/core");

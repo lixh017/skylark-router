@@ -25,6 +25,9 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error" | "warn"; text: string } | null>(null);
   const [restartRequired, setRestartRequired] = useState(false);
+  const [searchProvider, setSearchProvider] = useState<"tavily" | "serper" | "">("");
+  const [searchAPIKey, setSearchAPIKey] = useState("");
+  const [searchKeyTouched, setSearchKeyTouched] = useState(false);
 
   useEffect(() => {
     getConfig().then((cfg) => {
@@ -34,6 +37,8 @@ export default function SettingsPage() {
       setAuthToken(cfg.auth_token);
       setDefaultModel(cfg.default_model);
       setLogRequests(cfg.log_requests);
+      setSearchProvider((cfg.search_provider as "tavily" | "serper" | "") || "");
+      setSearchAPIKey(cfg.search_api_key || "");
     });
     if (isTauri()) {
       import("@tauri-apps/api/core").then(({ invoke }) => {
@@ -61,13 +66,18 @@ export default function SettingsPage() {
         port,
         log_requests: logRequests,
         default_model: defaultModel,
+        search_provider: searchProvider,
       };
       if (tokenTouched) {
         data.auth_token = authToken;
       }
+      if (searchKeyTouched) {
+        data.search_api_key = searchAPIKey;
+      }
       const res = await updateConfig(data);
       setMessage({ type: "success", text: t.settingsSaved });
       setTokenTouched(false);
+      setSearchKeyTouched(false);
       if (res.restart_required) {
         setRestartRequired(true);
       }
@@ -192,6 +202,52 @@ export default function SettingsPage() {
             </label>
           </FormField>
         </>
+      )}
+
+      {/* Web search section */}
+      <SectionTitle>联网搜索</SectionTitle>
+      <FormField label="搜索引擎" help="选择用于 Chat 联网搜索的服务商">
+        <div style={{ display: "flex", gap: 8 }}>
+          {(["tavily", "serper", ""] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => setSearchProvider(p)}
+              style={{
+                padding: "7px 14px", borderRadius: 7, fontSize: 13, cursor: "pointer",
+                border: `1px solid ${searchProvider === p ? "var(--accent)" : "var(--border)"}`,
+                background: searchProvider === p ? "var(--accent-bg)" : "var(--surface-2)",
+                color: searchProvider === p ? "var(--accent)" : "var(--text-secondary)",
+                fontWeight: searchProvider === p ? 600 : 400,
+              }}
+            >
+              {p === "" ? "禁用" : p === "tavily" ? "Tavily" : "Serper"}
+            </button>
+          ))}
+        </div>
+        {searchProvider === "tavily" && (
+          <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 }}>
+            免费 <strong>1,000 次/月</strong>，每月自动重置。超出后 $0.008/次。
+            注册获取 Key：<a href="https://app.tavily.com/home" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>app.tavily.com</a>
+          </div>
+        )}
+        {searchProvider === "serper" && (
+          <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 }}>
+            注册赠送 <strong>2,500 次</strong>（一次性，不重置）。超出后按量付费。
+            注册获取 Key：<a href="https://serper.dev" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>serper.dev</a>
+          </div>
+        )}
+      </FormField>
+      {searchProvider !== "" && (
+        <FormField label="API Key" help="保存后自动脱敏显示">
+          <input
+            type="password"
+            value={searchAPIKey}
+            onChange={(e) => { setSearchAPIKey(e.target.value); setSearchKeyTouched(true); }}
+            placeholder={searchAPIKey.startsWith("****") ? searchAPIKey : "粘贴 API Key…"}
+            style={{ ...inputStyle }}
+            autoComplete="off"
+          />
+        </FormField>
       )}
 
       {/* Save button */}
