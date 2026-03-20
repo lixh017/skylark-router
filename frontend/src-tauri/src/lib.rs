@@ -183,6 +183,7 @@ pub fn run() {
                         app.exit(0);
                     }
                     "show" => {
+                        let _ = app.show();
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.unminimize();
                             let _ = window.show();
@@ -194,6 +195,7 @@ pub fn run() {
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click { button: MouseButton::Left, .. } = event {
                         let app = tray.app_handle();
+                        let _ = app.show();
                         if let Some(window) = app.get_webview_window("main") {
                             let is_visible = window.is_visible().unwrap_or(false);
                             let is_minimized = window.is_minimized().unwrap_or(false);
@@ -226,6 +228,18 @@ pub fn run() {
             is_autostart_enabled,
             set_autostart,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                // Kill sidecar on any exit path (Dock Quit, SIGTERM, etc.)
+                if let Some(state) = app.try_state::<SidecarState>() {
+                    if let Ok(mut guard) = state.0.lock() {
+                        if let Some(child) = guard.take() {
+                            let _ = child.kill();
+                        }
+                    }
+                }
+            }
+        });
 }
