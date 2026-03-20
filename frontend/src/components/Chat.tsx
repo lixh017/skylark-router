@@ -326,13 +326,12 @@ export default function Chat() {
   const addFileAsAttachment = (file: File) => {
     const LIMITS: Record<string, number> = {
       image: 100 * 1024 * 1024, audio: 25 * 1024 * 1024,
-      video: 100 * 1024 * 1024, document: 10 * 1024 * 1024,
+      video: 100 * 1024 * 1024, document: 20 * 1024 * 1024,
     };
     const category = file.type.startsWith("image/") ? "image"
       : file.type.startsWith("audio/") ? "audio"
       : file.type.startsWith("video/") ? "video"
-      : (file.type === "application/pdf" || file.type.startsWith("text/")) ? "document" : null;
-    if (!category) { toast(`不支持的文件类型: ${file.type || file.name}`, "error"); return; }
+      : "document"; // pdf / txt / docx / xlsx / pptx / json / html / etc.
     if (file.size > LIMITS[category]) {
       toast(`文件过大（限 ${LIMITS[category] / 1024 / 1024}MB）`, "error");
       return;
@@ -379,12 +378,7 @@ export default function Chat() {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    const files = Array.from(e.dataTransfer.files).filter((f) => {
-      const t = f.type;
-      return t.startsWith("image/") || t.startsWith("audio/") || t.startsWith("video/")
-        || t === "application/pdf" || t.startsWith("text/");
-    });
-    files.forEach(addFileAsAttachment);
+    Array.from(e.dataTransfer.files).forEach(addFileAsAttachment);
   };
 
   const newChat = () => {
@@ -715,7 +709,7 @@ export default function Chat() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,audio/*,video/*,application/pdf,text/plain,text/markdown,text/csv"
+            accept="*/*"
             multiple
             onChange={handleFileChange}
             style={{ display: "none" }}
