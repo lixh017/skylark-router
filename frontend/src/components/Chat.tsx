@@ -324,11 +324,15 @@ export default function Chat() {
   };
 
   const addFileAsAttachment = (file: File) => {
-    const LIMITS: Record<string, number> = { image: 100 * 1024 * 1024, audio: 25 * 1024 * 1024, video: 100 * 1024 * 1024 };
+    const LIMITS: Record<string, number> = {
+      image: 100 * 1024 * 1024, audio: 25 * 1024 * 1024,
+      video: 100 * 1024 * 1024, document: 10 * 1024 * 1024,
+    };
     const category = file.type.startsWith("image/") ? "image"
       : file.type.startsWith("audio/") ? "audio"
-      : file.type.startsWith("video/") ? "video" : null;
-    if (!category) return;
+      : file.type.startsWith("video/") ? "video"
+      : (file.type === "application/pdf" || file.type.startsWith("text/")) ? "document" : null;
+    if (!category) { toast(`不支持的文件类型: ${file.type || file.name}`, "error"); return; }
     if (file.size > LIMITS[category]) {
       toast(`文件过大（限 ${LIMITS[category] / 1024 / 1024}MB）`, "error");
       return;
@@ -345,6 +349,9 @@ export default function Chat() {
         setAttachments((prev) => [...prev, { type: "input_audio", input_audio: { data: base64, format } }]);
       } else if (category === "video") {
         setAttachments((prev) => [...prev, { type: "video_url", video_url: { url: data, mime_type: file.type } }]);
+      } else {
+        const base64 = data.split(",")[1];
+        setAttachments((prev) => [...prev, { type: "document", document: { name: file.name, data: base64, mimeType: file.type } }]);
       }
     };
     reader.readAsDataURL(file);
@@ -358,7 +365,9 @@ export default function Chat() {
 
   const handlePaste = (e: React.ClipboardEvent) => {
     const items = Array.from(e.clipboardData.items);
-    const mediaItems = items.filter((it) => it.type.startsWith("image/") || it.type.startsWith("audio/") || it.type.startsWith("video/"));
+    const mediaItems = items.filter((it) =>
+      it.type.startsWith("image/") || it.type.startsWith("audio/") || it.type.startsWith("video/")
+    );
     if (mediaItems.length > 0) {
       e.preventDefault();
       mediaItems.forEach((it) => {
@@ -370,9 +379,11 @@ export default function Chat() {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    const files = Array.from(e.dataTransfer.files).filter(
-      (f) => f.type.startsWith("image/") || f.type.startsWith("audio/") || f.type.startsWith("video/")
-    );
+    const files = Array.from(e.dataTransfer.files).filter((f) => {
+      const t = f.type;
+      return t.startsWith("image/") || t.startsWith("audio/") || t.startsWith("video/")
+        || t === "application/pdf" || t.startsWith("text/");
+    });
     files.forEach(addFileAsAttachment);
   };
 
@@ -704,7 +715,7 @@ export default function Chat() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,audio/*,video/*"
+            accept="image/*,audio/*,video/*,application/pdf,text/plain,text/markdown,text/csv"
             multiple
             onChange={handleFileChange}
             style={{ display: "none" }}
@@ -722,9 +733,14 @@ export default function Chat() {
                       <span style={{ fontSize: 20 }}>🎵</span>
                       <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{part.input_audio.format.toUpperCase()}</span>
                     </div>
+                  ) : part.type === "document" ? (
+                    <div style={{ width: 120, height: 60, borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2, rgba(0,0,0,0.06))", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, padding: "0 6px" }}>
+                      <span style={{ fontSize: 18 }}>{part.document.mimeType === "application/pdf" ? "📄" : "📝"}</span>
+                      <span style={{ fontSize: 9, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%", textAlign: "center" }}>{part.document.name}</span>
+                    </div>
                   ) : (
                     <video
-                      src={part.video_url.url}
+                      src={(part as { video_url: { url: string } }).video_url.url}
                       muted
                       style={{ width: 80, height: 60, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)", display: "block" }}
                     />

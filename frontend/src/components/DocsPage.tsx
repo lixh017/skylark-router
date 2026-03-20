@@ -1,23 +1,17 @@
 import { useState, useEffect } from "react";
 import { useI18n } from "../i18n";
+import { getBackendOrigin } from "../api/client";
 
 type LangTab = "curl" | "python" | "js";
-
-const isTauri = () => typeof window !== "undefined" && !!window.__TAURI_INTERNALS__;
 
 export default function DocsPage() {
   const { t } = useI18n();
   const [langTab, setLangTab] = useState<LangTab>("curl");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [host, setHost] = useState(isTauri() ? "http://127.0.0.1:8080" : window.location.origin);
+  const [host, setHost] = useState("");
 
   useEffect(() => {
-    if (!isTauri()) return;
-    import("@tauri-apps/api/core").then(({ invoke }) =>
-      invoke<number>("get_backend_port").then((port) =>
-        setHost(`http://127.0.0.1:${port}`)
-      )
-    );
+    getBackendOrigin().then((origin) => setHost(origin || window.location.origin));
   }, []);
 
   const handleCopy = (text: string, key: string) => {

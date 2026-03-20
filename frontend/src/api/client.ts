@@ -17,7 +17,7 @@ const isTauri = () => typeof window !== "undefined" && !!window.__TAURI_INTERNAL
 
 let _backendOrigin: string | null = null;
 
-async function getBackendOrigin(): Promise<string> {
+export async function getBackendOrigin(): Promise<string> {
   if (!isTauri()) return ""; // relative URLs work fine in the browser
   if (_backendOrigin) return _backendOrigin;
   const { invoke } = await import("@tauri-apps/api/core");
@@ -188,6 +188,16 @@ function toAnthropicContent(content: string | ContentPart[]): unknown {
           type: "base64",
           media_type: p.video_url.mime_type,
           data: extractBase64(p.video_url.url),
+        },
+      };
+    }
+    if (p.type === "document") {
+      return {
+        type: "document",
+        source: {
+          type: "base64",
+          media_type: p.document.mimeType,
+          data: p.document.data,
         },
       };
     }

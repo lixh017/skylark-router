@@ -89,7 +89,12 @@ export interface ContentPartVideo {
   video_url: { url: string; mime_type: string };
 }
 
-export type ContentPart = ContentPartText | ContentPartImage | ContentPartAudio | ContentPartVideo;
+export interface ContentPartDocument {
+  type: "document";
+  document: { name: string; data: string; mimeType: string };
+}
+
+export type ContentPart = ContentPartText | ContentPartImage | ContentPartAudio | ContentPartVideo | ContentPartDocument;
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import type { Model, Provider } from "../types";
-import { listModels, deleteModel, listProviders } from "../api/client";
+import { listModels, deleteModel, listProviders, getBackendOrigin } from "../api/client";
 import ModelForm from "./ModelForm";
 import { Drawer } from "./ui/Drawer";
 import { useToast } from "./ui/Toast";
@@ -36,8 +36,7 @@ function groupCaps(routes: Model[]): GroupCaps {
   );
 }
 
-function buildSnippets(modelName: string, cap: CapTab): Record<LangTab, string> {
-  const host = window.location.origin;
+function buildSnippets(modelName: string, cap: CapTab, host: string): Record<LangTab, string> {
 
   if (cap === "vision") {
     return {
@@ -338,6 +337,11 @@ export default function ModelList() {
   const [langTab, setLangTab] = useState<Record<string, LangTab>>({});
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [host, setHost] = useState("");
+
+  useEffect(() => {
+    getBackendOrigin().then((origin) => setHost(origin || window.location.origin));
+  }, []);
 
   const load = () => {
     setLoading(true);
@@ -430,7 +434,7 @@ export default function ModelList() {
             const caps = groupCaps(group.routes);
             const cTab: CapTab = capTab[group.name] || "text";
             const lTab: LangTab = langTab[group.name] || "curl";
-            const snippets = buildSnippets(group.name, cTab);
+            const snippets = buildSnippets(group.name, cTab, host);
             const copyKey = `${group.name}-${cTab}-${lTab}`;
 
             const capTabs: { key: CapTab; label: string }[] = [

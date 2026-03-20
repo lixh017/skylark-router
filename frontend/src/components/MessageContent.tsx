@@ -312,6 +312,18 @@ export default function MessageContent({
               />
             );
           }
+          if (part.type === "document") {
+            return (
+              <div key={i} style={{
+                display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px",
+                borderRadius: 7, border: "1px solid var(--border)",
+                background: "var(--surface-2, rgba(0,0,0,0.05))", marginBottom: 8, fontSize: 13,
+              }}>
+                <span>{part.document.mimeType === "application/pdf" ? "📄" : "📝"}</span>
+                <span style={{ color: "var(--text-secondary)" }}>{part.document.name}</span>
+              </div>
+            );
+          }
           return <div key={i}>{renderMarkdown(part.text)}</div>;
         })}
       </div>
