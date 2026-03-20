@@ -82,7 +82,10 @@ jobs:
 
       - name: Build universal macOS DMG
         working-directory: frontend
-        run: npm run tauri:build:mac:universal:dmg
+        run: |
+          VERSION_NUM="${VERSION#v}"
+          python3 -c "import json; c=json.load(open('src-tauri/tauri.conf.json')); c['version']='${VERSION_NUM}'; json.dump(c,open('src-tauri/tauri.conf.json','w'),indent=2)"
+          npm run tauri:build:mac:universal:dmg
         env:
           VERSION: ${{ github.ref_name }}
 
@@ -105,7 +108,8 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
-            patchelf
+            patchelf \
+            squashfs-tools
 
       - uses: actions/setup-node@v4
         with:
@@ -136,7 +140,10 @@ jobs:
 
       - name: Build Linux bundle
         working-directory: frontend
-        run: npx tauri build --bundles deb,appimage
+        run: |
+          VERSION_NUM="${VERSION#v}"
+          python3 -c "import json; c=json.load(open('src-tauri/tauri.conf.json')); c['version']='${VERSION_NUM}'; json.dump(c,open('src-tauri/tauri.conf.json','w'),indent=2)"
+          npx tauri build --bundles deb,appimage
         env:
           VERSION: ${{ github.ref_name }}
 
@@ -184,7 +191,11 @@ jobs:
 
       - name: Build Windows bundle
         working-directory: frontend
-        run: npx tauri build --bundles msi,nsis
+        shell: bash
+        run: |
+          VERSION_NUM="${VERSION#v}"
+          python3 -c "import json; c=json.load(open('src-tauri/tauri.conf.json')); c['version']='${VERSION_NUM}'; json.dump(c,open('src-tauri/tauri.conf.json','w'),indent=2)"
+          npx tauri build --bundles msi,nsis
         env:
           VERSION: ${{ github.ref_name }}
 
