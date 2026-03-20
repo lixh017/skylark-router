@@ -94,7 +94,17 @@ export interface ContentPartDocument {
   document: { name: string; data: string; mimeType: string };
 }
 
-export type ContentPart = ContentPartText | ContentPartImage | ContentPartAudio | ContentPartVideo | ContentPartDocument;
+// Lightweight reference stored in state/localStorage — actual bytes live in IndexedDB
+export interface ContentPartRef {
+  type: "attachment_ref";
+  id: string;
+  name: string;
+  mimeType: string;
+  category: "image" | "audio" | "video" | "document";
+  previewUrl?: string; // ObjectURL — transient, never persisted
+}
+
+export type ContentPart = ContentPartText | ContentPartImage | ContentPartAudio | ContentPartVideo | ContentPartDocument | ContentPartRef;
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -110,6 +120,7 @@ export interface ChatRequest {
   top_p?: number;
   frequency_penalty?: number;
   presence_penalty?: number;
+  disable_thinking?: boolean;
 }
 
 export interface APIKey {

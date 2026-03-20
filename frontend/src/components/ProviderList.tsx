@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Provider, Model } from "../types";
 import { listProviders, deleteProvider, testProvider, listModels } from "../api/client";
-import ProviderForm from "./ProviderForm";
+import ProviderForm, { PRESETS } from "./ProviderForm";
 import { Drawer } from "./ui/Drawer";
 import { useI18n } from "../i18n";
 import { useToast } from "./ui/Toast";
@@ -108,21 +108,38 @@ export default function ProviderList() {
             const ts = testStates[p.id];
             const pModels = getProviderModels(p.id);
             const modelCount = allModels.filter((m) => m.provider_id === p.id).length;
+            const preset = PRESETS.find((pr) => pr.name === p.name);
+            const displayLabel = preset?.label ?? p.name;
+            const category = preset?.category;
 
             return (
               <div key={p.id} style={cardStyle}>
                 {/* Card header */}
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
                     {/* Status dot */}
                     <span style={{
                       width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
                       background: p.enabled ? "var(--success)" : "var(--text-muted)",
                       boxShadow: p.enabled ? "0 0 0 2px var(--success-bg)" : "none",
                     }} />
-                    <span style={{ fontWeight: 600, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {p.name}
-                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {displayLabel}
+                      </div>
+                      {preset && displayLabel !== p.name && (
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 1 }}>{p.name}</div>
+                      )}
+                    </div>
+                    {category && (
+                      <span style={{
+                        padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 600, flexShrink: 0,
+                        background: category === "china" ? "rgba(255,100,0,0.1)" : category === "local" ? "var(--surface-2)" : "rgba(59,130,246,0.1)",
+                        color: category === "china" ? "#e05c00" : category === "local" ? "var(--text-muted)" : "#3b82f6",
+                      }}>
+                        {category === "china" ? "国内" : category === "local" ? "本地" : "国际"}
+                      </span>
+                    )}
                   </div>
                   {/* Protocol badge */}
                   <span style={{

@@ -1,5 +1,6 @@
-import { useState } from "react";
-import type { ContentPart } from "../types";
+import { useState, useEffect } from "react";
+import type { ContentPart, ContentPartRef } from "../types";
+import { loadAttachment } from "../utils/attachmentDB";
 
 /* ── Think block parsing ── */
 type ParsedPart =
@@ -234,6 +235,51 @@ function renderMarkdown(text: string): React.ReactNode {
   return blocks.length > 0 ? <>{blocks}</> : null;
 }
 
+/* ── Attachment ref renderer (async loads from IndexedDB) ── */
+function AttachmentRefRenderer({ part }: { part: ContentPartRef }) {
+  const [url, setUrl] = useState<string | null>(part.previewUrl ?? null);
+
+  useEffect(() => {
+    if (url) return;
+    let objUrl: string | null = null;
+    loadAttachment(part.id).then((record) => {
+      if (record) {
+        const blob = new Blob([record.data], { type: record.mimeType });
+        objUrl = URL.createObjectURL(blob);
+        setUrl(objUrl);
+      }
+    }).catch(console.error);
+    return () => { if (objUrl) URL.revokeObjectURL(objUrl); };
+  }, [part.id]);
+
+  if (!url) {
+    return (
+      <span style={{ color: "var(--text-muted)", fontSize: 13 }}>[{part.name}]</span>
+    );
+  }
+  if (part.category === "image") {
+    return (
+      <img src={url} style={{ maxWidth: "100%", maxHeight: 280, borderRadius: 8, display: "block", marginBottom: 8, objectFit: "contain" }} alt={part.name} />
+    );
+  }
+  if (part.category === "audio") {
+    return (
+      <audio controls src={url} style={{ maxWidth: "100%", marginBottom: 8, display: "block" }} />
+    );
+  }
+  if (part.category === "video") {
+    return (
+      <video controls src={url} style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 8, marginBottom: 8, display: "block" }} />
+    );
+  }
+  return (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface-2, rgba(0,0,0,0.05))", marginBottom: 8, fontSize: 13 }}>
+      <span>{part.mimeType === "application/pdf" ? "📄" : "📝"}</span>
+      <span style={{ color: "var(--text-secondary)" }}>{part.name}</span>
+    </div>
+  );
+}
+
 /* ── Think block component ── */
 function ThinkBlock({ content, streaming }: { content: string; streaming: boolean }) {
   const [collapsed, setCollapsed] = useState(true);
@@ -282,6 +328,9 @@ export default function MessageContent({
     return (
       <div>
         {content.map((part, i) => {
+          if (part.type === "attachment_ref") {
+            return <AttachmentRefRenderer key={i} part={part as ContentPartRef} />;
+          }
           if (part.type === "image_url") {
             return (
               <img

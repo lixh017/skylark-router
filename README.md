@@ -1,18 +1,35 @@
 # 灵雀 Skylark Router
 
-A personal LLM routing gateway — manage multiple AI providers in one place, with a clean web UI and a single API endpoint for all your apps.
+A personal LLM routing gateway — manage multiple AI providers in one place, with a built-in Chat UI, a desktop app, and a single API endpoint for all your tools.
 
 **English** | [中文](#中文说明)
+
+---
+
+## Two deployment modes
+
+| Mode | Best for |
+|------|----------|
+| **Desktop App** (Tauri) | Personal use on macOS — native .app, no terminal needed |
+| **Server binary / Docker** | Home server, NAS, team shared gateway |
 
 ---
 
 ## Features
 
 - **Multi-provider routing** — OpenAI-compatible & Anthropic APIs
+- **20+ provider presets** — OpenAI, Anthropic, DeepSeek, SiliconFlow, Moonshot, 智谱 AI, 阿里百炼, Groq, Ollama, and more
+- **✦ Auto routing** — automatically selects the highest-priority healthy route
 - **Weighted load balancing** — distribute traffic across providers by weight
 - **Failover** — automatically retry with the next route on failure
+- **Built-in Chat UI** — multi-column model comparison, streaming, file attachments, Markdown + code highlighting
+- **File attachments** — images, audio, video, documents (PDF / Word / Excel / …)
+- **Extended thinking** — collapsible think blocks, per-column "No thinking" toggle
+- **Chat parameters** — Temperature, Top P, Max tokens, Frequency/Presence Penalty, Context limit, System prompt
+- **Web search** — optional search injection before sending to the model
 - **Per-key rate limiting & quota** — control usage per API key
 - **Request logs** — full request/response body logging (optional)
+- **Statistics & timeseries** — requests, cost, latency charts
 - **Multi-language UI** — English, 中文, 日本語, 한국어, Français, Deutsch, Español
 - **Light / Dark / System theme**
 - **Single binary** — frontend embedded, no separate web server needed
@@ -21,7 +38,37 @@ A personal LLM routing gateway — manage multiple AI providers in one place, wi
 
 ---
 
-## Quick Start
+## Desktop App (macOS)
+
+### Requirements
+
+- macOS 12+
+- Rust toolchain (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
+- Node.js 18+ and Go 1.22+
+
+### Run in dev mode
+
+```bash
+make tauri-dev
+```
+
+### Build .dmg
+
+```bash
+# Current architecture
+make tauri-build-dmg
+
+# Universal binary (arm64 + x86_64)
+make tauri-build-universal-dmg
+```
+
+The `.dmg` will be in `frontend/src-tauri/target/release/bundle/dmg/`.
+
+See [`docs/desktop-app.md`](docs/desktop-app.md) for full details.
+
+---
+
+## Server / Binary
 
 ### Download binary
 
@@ -37,7 +84,7 @@ chmod +x skylark-router-linux-amd64
 ./skylark-router-linux-amd64
 ```
 
-The dashboard will open automatically at `http://localhost:8080`.
+The dashboard opens automatically at `http://localhost:8080`.
 
 ### Build from source
 
@@ -52,178 +99,38 @@ make build
 ### Docker
 
 ```bash
-# Pull and run
-docker compose up -d
-
-# Or build locally
-make docker-build
 docker compose up -d
 ```
 
 ---
 
-## Configuration
+## Quick start
 
-On first launch, `config.yaml` is created next to the binary:
-
-```yaml
-# Bind address (0.0.0.0 = all interfaces, 127.0.0.1 = localhost only)
-host: "0.0.0.0"
-
-# Port to listen on
-port: "8080"
-
-# SQLite database path (relative to binary directory)
-db_path: "skylark-router.db"
-
-# Admin token to protect the dashboard (leave empty to disable auth)
-auth_token: ""
-
-# Default model when request omits the model field
-# Use "auto" to auto-select the highest-priority model across all mappings
-default_model: ""
-
-# Log full request/response bodies (for debugging)
-log_requests: false
-```
-
-Environment variables override the config file:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `HOST` | `0.0.0.0` | Bind address (`127.0.0.1` for localhost only) |
-| `PORT` | `8080` | HTTP listen port |
-| `DB_PATH` | `skylark-router.db` | SQLite database path |
-| `AUTH_TOKEN` | _(none)_ | Admin dashboard token |
-| `DEFAULT_MODEL` | _(none)_ | Default model when request omits `model` field (`"auto"` = highest-priority) |
-| `LOG_REQUESTS` | `false` | Enable request body logging |
-
----
-
-## Usage
-
-### 1. Add a provider
-
-Go to **Providers** tab → **+ Add Provider**.
-
-Use the quick-fill cards to pre-fill settings for popular providers:
-
-| Provider | Protocol | Notes |
-|----------|----------|-------|
-| OpenAI | OpenAI | `https://api.openai.com/v1` |
-| Anthropic | Anthropic | `https://api.anthropic.com` |
-| DeepSeek | OpenAI | `https://api.deepseek.com/v1` |
-| SiliconFlow | OpenAI | `https://api.siliconflow.cn/v1` |
-| Groq | OpenAI | `https://api.groq.com/openai/v1` |
-| Ollama | OpenAI | `http://localhost:11434/v1` |
-| … | | Moonshot, 零一万物, 阿里百炼, Together AI |
-
-### 2. Add model mappings
-
-Go to **Models** tab → **+ Add Model**.
-
-- **External name** — the name your apps will use (e.g. `gpt-4o`)
-- **Provider model** — the actual model name the provider API expects (e.g. `gpt-4o-2024-08-06`)
-- **Priority** — higher = preferred when multiple routes exist
-- **Weight** — load-balancing ratio (e.g. weight 3:1 sends ~75% to the first route)
-
-Multiple routes for the same external name enable **failover** and **load balancing** automatically.
-
-### 3. Call the API
-
-Point your existing OpenAI SDK or HTTP client to the router:
+1. **Add a provider** — Providers tab → **+ Add Provider** → pick a preset → enter your API key
+2. **Add model mappings** — Models tab → **+ Add Model** → set external name, provider model, priority
+3. **Call the API**
 
 ```bash
-# Chat completion
 curl http://localhost:8080/v1/chat/completions \
-  -H "Authorization: Bearer sk-your-key" \
+  -H "Authorization: Bearer YOUR_KEY" \
   -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-4o",
-    "messages": [{"role": "user", "content": "Hello"}]
-  }'
+  -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
-```python
-from openai import OpenAI
-
-client = OpenAI(
-    base_url="http://localhost:8080/v1",
-    api_key="sk-your-key",   # your router API key, or any string if auth disabled
-)
-
-response = client.chat.completions.create(
-    model="gpt-4o",
-    messages=[{"role": "user", "content": "Hello"}],
-)
-print(response.choices[0].message.content)
-```
-
-```javascript
-import OpenAI from "openai";
-
-const client = new OpenAI({
-  baseURL: "http://localhost:8080/v1",
-  apiKey: "sk-your-key",
-  dangerouslyAllowBrowser: true,
-});
-
-const response = await client.chat.completions.create({
-  model: "gpt-4o",
-  messages: [{ role: "user", content: "Hello" }],
-});
-console.log(response.choices[0].message.content);
-```
-
-### 4. Using with Cursor / other tools
-
-In Cursor settings → Models → OpenAI API Key, set:
-- **Base URL**: `http://localhost:8080/v1`
-- **API Key**: your router API key (or any string if auth is disabled)
-
-Same pattern applies to any tool that supports a custom OpenAI base URL.
+Point any OpenAI-compatible client at `http://localhost:8080/v1`.
 
 ---
 
-## API Keys
+## Documentation
 
-Go to **API Keys** tab to create keys and control access.
-
-| Field | Description |
-|-------|-------------|
-| **Rate Limit** | Max requests per minute (0 = unlimited) |
-| **Quota** | Total token budget (0 = unlimited) |
-
-When no API keys are configured, all proxy requests are allowed without authentication.
-
----
-
-## Proxy Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/v1/chat/completions` | Chat completions (streaming supported) |
-| `POST` | `/v1/images/generations` | Image generation |
-| `POST` | `/v1/embeddings` | Embeddings |
-| `POST` | `/v1/messages` | Anthropic Messages API |
-| `GET` | `/v1/models` | List available models |
-
----
-
-## Development
-
-```bash
-# Run backend and frontend separately (hot reload)
-cd backend && go run .          # API at :8080
-cd frontend && npm run dev      # UI at :5173 (proxied to :8080)
-```
-
-Build release binaries for all platforms:
-
-```bash
-make release VERSION=v1.0.0
-# Output: dist/skylark-router-{os}-{arch}[.exe]
-```
+| Document | Description |
+|----------|-------------|
+| [`docs/getting-started.md`](docs/getting-started.md) | Full setup walkthrough |
+| [`docs/desktop-app.md`](docs/desktop-app.md) | Desktop app build and usage |
+| [`docs/routing.md`](docs/routing.md) | Providers, model routing, load balancing |
+| [`docs/chat-ui.md`](docs/chat-ui.md) | Chat UI features and keyboard shortcuts |
+| [`docs/configuration.md`](docs/configuration.md) | All config options (YAML / env vars) |
+| [`docs/api-reference.md`](docs/api-reference.md) | API endpoints and authentication |
 
 ---
 
@@ -231,25 +138,25 @@ make release VERSION=v1.0.0
 
 ```
 ┌─────────────────────────────────┐
-│         Your App / Cursor       │
+│    Your App / Cursor / Chat UI  │
 │    OpenAI SDK / HTTP client     │
 └────────────┬────────────────────┘
              │ POST /v1/chat/completions
              ▼
 ┌─────────────────────────────────┐
-│          灵雀 Skylark Router         │
-│  ┌─────────────────────────┐    │
-│  │  Auth  │  Rate Limit    │    │
-│  ├─────────────────────────┤    │
-│  │  Route Selection        │    │
-│  │  (priority + weighted   │    │
-│  │   random + failover)    │    │
-│  └────────────┬────────────┘    │
+│        灵雀 Skylark Router       │
+│  ┌─────────────────────────┐   │
+│  │  Auth  │  Rate Limit    │   │
+│  ├─────────────────────────┤   │
+│  │  Route Selection        │   │
+│  │  (priority + weighted   │   │
+│  │   random + failover)    │   │
+│  └────────────┬────────────┘   │
 └───────────────┼─────────────────┘
         ┌───────┴────────┐
         ▼                ▼
-   Provider A       Provider B
-  (OpenAI)        (DeepSeek)
+   Provider A        Provider B
+  (OpenAI)         (DeepSeek)
 ```
 
 ---
@@ -262,7 +169,14 @@ MIT — see [LICENSE](LICENSE)
 
 ## 中文说明
 
-灵雀是一个个人 LLM 路由网关，将多个 AI 服务商聚合在一个统一的 API 端点下。
+灵雀是一个个人 LLM 路由网关，将多个 AI 服务商聚合在一个统一入口下，内置 Chat UI、桌面应用和完整管理面板。
+
+### 两种部署方式
+
+| 方式 | 适用场景 |
+|------|----------|
+| **桌面端 App**（Tauri） | macOS 个人使用，双击打开，无需命令行 |
+| **服务器二进制 / Docker** | 家用服务器、NAS、团队共享网关 |
 
 ### 快速开始
 
@@ -274,23 +188,11 @@ MIT — see [LICENSE](LICENSE)
 
 启动后自动打开 `http://localhost:8080` 管理面板。
 
-### 基本流程
+**基本流程：**
 
 1. **Providers（提供商）** — 添加 OpenAI、DeepSeek、SiliconFlow 等服务商
-2. **Models（模型）** — 设置模型映射，同一个外部名可配置多个路由实现负载均衡和自动故障转移
-3. **API Keys** — 可选，为不同应用创建独立密钥并设置限流/配额
-4. 将你的应用 `base_url` 改为 `http://localhost:8080/v1` 即可
+2. **Models（模型）** — 设置模型映射，同一个外部名可配置多个路由实现负载均衡和故障转移
+3. **API Keys（可选）** — 为不同应用创建独立密钥并设置限流/配额
+4. 将你的应用 `base_url` 改为 `http://localhost:8080/v1`
 
-### 配置文件
-
-首次运行会在二进制文件同目录自动生成 `config.yaml`：
-
-```yaml
-host: "0.0.0.0"       # 绑定地址（0.0.0.0=所有网卡，127.0.0.1=仅本机）
-port: "8080"          # 监听端口
-db_path: "skylark-router.db"  # 数据库路径
-auth_token: ""        # 管理面板访问令牌（留空则不验证）
-log_requests: false   # 是否记录完整请求/响应体
-```
-
-环境变量（`PORT`、`DB_PATH`、`AUTH_TOKEN`、`LOG_REQUESTS`）优先级高于配置文件。
+详细文档见 [`docs/`](docs/) 目录。

@@ -19,6 +19,17 @@ func generateRandomHex(n int) string {
 	return hex.EncodeToString(b)
 }
 
+// GET /api/keys/:id/reveal — return the full key value
+func RevealAPIKey(c *gin.Context) {
+	id := c.Param("id")
+	var key models.APIKey
+	if err := database.DB.First(&key, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Key not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"key": key.Key})
+}
+
 // GET /api/keys
 func ListAPIKeys(c *gin.Context) {
 	var keys []models.APIKey

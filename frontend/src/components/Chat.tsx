@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ChatMessage, ChatRequest, ContentPart, Model } from "../types";
+import type { ChatMessage, ChatRequest, ContentPart, ContentPartRef, Model } from "../types";
 import { listModels, streamChat, searchWeb, getConfig } from "../api/client";
+import { saveAttachment, loadAttachment, deleteAttachments, arrayBufferToBase64 } from "../utils/attachmentDB";
 import { useI18n } from "../i18n";
 import MessageContent from "./MessageContent";
 import { useToast } from "./ui/Toast";
@@ -14,6 +15,7 @@ interface Params {
   topP: number;           // 0 = don't send
   frequencyPenalty: number;
   presencePenalty: number;
+  disableThinking: boolean; // Anthropic: thinking:{type:"disabled"}
 }
 
 interface Column {
@@ -69,6 +71,7 @@ const genId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 const defaultParams = (): Params => ({
   temperature: 0.7, maxTokens: 0, systemPrompt: "",
   contextLimit: 0, topP: 0, frequencyPenalty: 0, presencePenalty: 0,
+  disableThinking: false,
 });
 const makeCol = (name: string): Column => ({
   id: nextId++, modelName: name, protocol: "openai",
@@ -137,6 +140,8 @@ export default function Chat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const pendingConvIdRef = useRef<string | null>(null);
+  const pendingChunks = useRef<Record<number, string>>({});
+  const rafHandle = useRef<number | null>(null);
 
   /* Load models */
   useEffect(() => {
@@ -158,8 +163,24 @@ export default function Chat() {
   useEffect(() => { activeConvIdRef.current = activeConvId; }, [activeConvId]);
 
   const doSave = (cols: Column[]) => {
+    // Strip transient previewUrl from attachment_refs before persisting
+    const stripPreview = (messages: ChatMessage[]): ChatMessage[] =>
+      messages.map((msg) => {
+        if (!Array.isArray(msg.content)) return msg;
+        const content = msg.content.map((p) => {
+          if (p.type === "attachment_ref" && p.previewUrl) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { previewUrl: _url, ...rest } = p;
+            return rest;
+          }
+          return p;
+        });
+        return { ...msg, content };
+      });
+
     const colData = cols.map((c) => ({
-      modelName: c.modelName, protocol: c.protocol, params: c.params, messages: c.messages,
+      modelName: c.modelName, protocol: c.protocol, params: c.params,
+      messages: stripPreview(c.messages),
     }));
     const now = Date.now();
     // Read current IDs from refs (not from state) to avoid nested setState
@@ -204,14 +225,23 @@ export default function Chat() {
     setColumns((prev) => prev.map((c) => c.id === id ? { ...c, params: { ...c.params, ...patch } } : c));
 
   const appendChunk = (id: number, chunk: string) => {
-    setColumns((prev) => prev.map((c) => {
-      if (c.id !== id) return c;
-      const msgs = [...c.messages];
-      if (msgs.length && msgs[msgs.length - 1].role === "assistant") {
-        msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content: msgs[msgs.length - 1].content + chunk };
-      }
-      return { ...c, messages: msgs };
-    }));
+    pendingChunks.current[id] = (pendingChunks.current[id] ?? "") + chunk;
+    if (rafHandle.current === null) {
+      rafHandle.current = requestAnimationFrame(() => {
+        const batch = pendingChunks.current;
+        pendingChunks.current = {};
+        rafHandle.current = null;
+        setColumns((prev) => prev.map((c) => {
+          const extra = batch[c.id];
+          if (!extra) return c;
+          const msgs = [...c.messages];
+          if (msgs.length && msgs[msgs.length - 1].role === "assistant") {
+            msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content: msgs[msgs.length - 1].content + extra };
+          }
+          return { ...c, messages: msgs };
+        }));
+      });
+    }
   };
 
   // Strip media (image/audio/video) from historical messages, keep only text.
@@ -225,11 +255,14 @@ export default function Chat() {
       return { ...msg, content: text || "[附件]" };
     });
 
-  const streamCol = async (col: Column, userMessages: ChatMessage[], signal: AbortSignal): Promise<Column> => {
-    // Apply context limit (keep system prompt + last N messages)
+  const streamCol = async (col: Column, apiMessages: ChatMessage[], stateMessages: ChatMessage[], signal: AbortSignal): Promise<Column> => {
+    // Apply context limit on API messages (has base64 resolved)
     const limited = col.params.contextLimit > 0
-      ? userMessages.slice(-col.params.contextLimit)
-      : userMessages;
+      ? apiMessages.slice(-col.params.contextLimit)
+      : apiMessages;
+    const limitedState = col.params.contextLimit > 0
+      ? stateMessages.slice(-col.params.contextLimit)
+      : stateMessages;
     const req: ChatRequest = {
       model: col.modelName,
       messages: col.params.systemPrompt
@@ -240,6 +273,7 @@ export default function Chat() {
       ...(col.params.topP > 0 && { top_p: col.params.topP }),
       ...(col.params.frequencyPenalty !== 0 && { frequency_penalty: col.params.frequencyPenalty }),
       ...(col.params.presencePenalty !== 0 && { presence_penalty: col.params.presencePenalty }),
+      ...(col.params.disableThinking && { disable_thinking: true }),
     };
     let content = "";
     try {
@@ -251,7 +285,7 @@ export default function Chat() {
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         patchColumn(col.id, { isLoading: false });
-        return { ...col, messages: [...userMessages, { role: "assistant", content }], isLoading: false };
+        return { ...col, messages: [...limitedState, { role: "assistant", content }], isLoading: false };
       }
       const msg = err instanceof Error ? err.message : t.requestFailed;
       setColumns((prev) => prev.map((c) => {
@@ -262,22 +296,36 @@ export default function Chat() {
         }
         return { ...c, messages: msgs, isLoading: false };
       }));
-      return { ...col, messages: [...userMessages, { role: "assistant", content: `⚠ ${msg}` }], isLoading: false };
+      return { ...col, messages: [...limitedState, { role: "assistant", content: `⚠ ${msg}` }], isLoading: false };
     }
     patchColumn(col.id, { isLoading: false });
-    return { ...col, messages: [...userMessages, { role: "assistant", content }], isLoading: false };
+    return { ...col, messages: [...limitedState, { role: "assistant", content }], isLoading: false };
+  };
+
+  // Resolve an attachment_ref to a concrete ContentPart (with base64) for sending to API
+  const resolveRef = async (ref: ContentPartRef): Promise<ContentPart> => {
+    const record = await loadAttachment(ref.id);
+    if (!record) return { type: "text", text: `[${ref.name}]` };
+    const b64 = arrayBufferToBase64(record.data);
+    if (ref.category === "image") return { type: "image_url", image_url: { url: `data:${ref.mimeType};base64,${b64}` } };
+    if (ref.category === "audio") {
+      const format = ref.mimeType.split("/")[1].replace("mpeg", "mp3");
+      return { type: "input_audio", input_audio: { data: b64, format } };
+    }
+    if (ref.category === "video") return { type: "video_url", video_url: { url: `data:${ref.mimeType};base64,${b64}`, mime_type: ref.mimeType } };
+    return { type: "document", document: { name: ref.name, data: b64, mimeType: ref.mimeType } };
   };
 
   const handleSend = async () => {
     const text = input.trim();
     if ((!text && attachments.length === 0) || columns.length === 0) return;
 
-    // Capability validation
-    const hasImage = attachments.some((a) => a.type === "image_url");
-    const hasAudio = attachments.some((a) => a.type === "input_audio");
-    const hasVideo = attachments.some((a) => a.type === "video_url");
+    // Capability validation (all attachments are now attachment_ref)
+    const hasImage = attachments.some((a) => a.type === "attachment_ref" && (a as ContentPartRef).category === "image");
+    const hasAudio = attachments.some((a) => a.type === "attachment_ref" && (a as ContentPartRef).category === "audio");
+    const hasVideo = attachments.some((a) => a.type === "attachment_ref" && (a as ContentPartRef).category === "video");
     for (const col of columns) {
-      if (col.modelName === "auto") continue; // router handles capability filtering
+      if (col.modelName === "auto") continue;
       const m = allModels.find((m) => m.name === col.modelName);
       if (!m) continue;
       if (hasImage && !m.input_image) { toast(`${col.modelName} 不支持图片输入`, "error"); return; }
@@ -309,65 +357,65 @@ export default function Chat() {
     if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
 
     const finalText = searchContext ? searchContext + text : text;
+    const refs = attachments.filter((a) => a.type === "attachment_ref") as ContentPartRef[];
 
-    let userContent: string | ContentPart[];
-    if (attachments.length > 0) {
-      userContent = [
-        ...attachments,
-        ...(finalText ? [{ type: "text" as const, text: finalText }] : []),
-      ];
-    } else {
-      userContent = finalText;
-    }
+    // Resolve refs → base64 ContentParts for the API request
+    const resolvedParts = await Promise.all(refs.map(resolveRef));
+
+    // Lightweight message stored in state/localStorage (refs, no base64, no previewUrl)
+    const refsWithoutPreview = refs.map(({ previewUrl: _url, ...r }) => r as ContentPartRef);
+    const userMsgState: ChatMessage = {
+      role: "user",
+      content: refsWithoutPreview.length > 0
+        ? [...refsWithoutPreview, ...(finalText ? [{ type: "text" as const, text: finalText }] : [])]
+        : finalText,
+    };
+    // Full message sent to API (base64 resolved)
+    const userMsgAPI: ChatMessage = {
+      role: "user",
+      content: resolvedParts.length > 0
+        ? [...resolvedParts, ...(finalText ? [{ type: "text" as const, text: finalText }] : [])]
+        : finalText,
+    };
+
+    // Revoke ObjectURLs and clear pending attachments
+    refs.forEach((r) => { if (r.previewUrl) URL.revokeObjectURL(r.previewUrl); });
     setAttachments([]);
 
-    const userMsg: ChatMessage = { role: "user", content: userContent };
     const snap = columns;
     const abort = new AbortController();
     abortRef.current = abort;
     setColumns(snap.map((c) => ({
-      ...c, messages: [...c.messages, userMsg, { role: "assistant", content: "" }], isLoading: true,
+      ...c, messages: [...c.messages, userMsgState, { role: "assistant", content: "" }], isLoading: true,
     })));
     const finalCols = await Promise.all(snap.map((col) => {
-      const history = [...col.messages, userMsg];
-      return streamCol({ ...col }, history, abort.signal);
+      const apiHistory = [...col.messages, userMsgAPI];
+      const stateHistory = [...col.messages, userMsgState];
+      return streamCol({ ...col }, apiHistory, stateHistory, abort.signal);
     }));
-    // finalCols has the definitive final state — save it directly
     const hasContent = finalCols.some((c) => c.messages.some((m) => m.role === "assistant" && m.content));
     if (hasContent) doSave(finalCols);
   };
 
-  const addFileAsAttachment = (file: File) => {
+  const addFileAsAttachment = async (file: File) => {
     const LIMITS: Record<string, number> = {
       image: 100 * 1024 * 1024, audio: 25 * 1024 * 1024,
       video: 100 * 1024 * 1024, document: 20 * 1024 * 1024,
     };
-    const category = file.type.startsWith("image/") ? "image"
+    const category: ContentPartRef["category"] = file.type.startsWith("image/") ? "image"
       : file.type.startsWith("audio/") ? "audio"
       : file.type.startsWith("video/") ? "video"
-      : "document"; // pdf / txt / docx / xlsx / pptx / json / html / etc.
+      : "document";
     if (file.size > LIMITS[category]) {
       toast(`文件过大（限 ${LIMITS[category] / 1024 / 1024}MB）`, "error");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const data = e.target?.result as string;
-      if (!data) return;
-      if (category === "image") {
-        setAttachments((prev) => [...prev, { type: "image_url", image_url: { url: data } }]);
-      } else if (category === "audio") {
-        const format = file.type.split("/")[1].replace("mpeg", "mp3");
-        const base64 = data.split(",")[1];
-        setAttachments((prev) => [...prev, { type: "input_audio", input_audio: { data: base64, format } }]);
-      } else if (category === "video") {
-        setAttachments((prev) => [...prev, { type: "video_url", video_url: { url: data, mime_type: file.type } }]);
-      } else {
-        const base64 = data.split(",")[1];
-        setAttachments((prev) => [...prev, { type: "document", document: { name: file.name, data: base64, mimeType: file.type } }]);
-      }
-    };
-    reader.readAsDataURL(file);
+    const id = `att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const buf = await file.arrayBuffer();
+    await saveAttachment(id, file.name, file.type, buf);
+    const previewUrl = URL.createObjectURL(new Blob([buf], { type: file.type }));
+    const ref: ContentPartRef = { type: "attachment_ref", id, name: file.name, mimeType: file.type, category, previewUrl };
+    setAttachments((prev) => [...prev, ref]);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -410,8 +458,22 @@ export default function Chat() {
     })));
   };
 
+  const collectAttachmentIds = (conv: SavedConv): string[] => {
+    const ids: string[] = [];
+    conv.columns.forEach((col) => {
+      col.messages.forEach((msg) => {
+        if (Array.isArray(msg.content)) {
+          msg.content.forEach((p) => { if (p.type === "attachment_ref") ids.push(p.id); });
+        }
+      });
+    });
+    return ids;
+  };
+
   const deleteConv = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const conv = conversations.find((c) => c.id === id);
+    if (conv) deleteAttachments(collectAttachmentIds(conv)).catch(console.error);
     const updated = conversations.filter((c) => c.id !== id);
     writeStore(updated);
     setConversations(updated);
@@ -432,9 +494,9 @@ export default function Chat() {
   const canSend = (input.trim().length > 0 || attachments.length > 0) && !anyLoading && !isSearching && columns.length > 0;
   const groups = groupConvs(conversations);
 
-  const hasImage = attachments.some((a) => a.type === "image_url");
-  const hasAudio = attachments.some((a) => a.type === "input_audio");
-  const hasVideo = attachments.some((a) => a.type === "video_url");
+  const hasImage = attachments.some((a) => a.type === "attachment_ref" && (a as ContentPartRef).category === "image");
+  const hasAudio = attachments.some((a) => a.type === "attachment_ref" && (a as ContentPartRef).category === "audio");
+  const hasVideo = attachments.some((a) => a.type === "attachment_ref" && (a as ContentPartRef).category === "video");
   const getColWarning = (col: Column): string | null => {
     if (col.modelName === "auto") return null;
     const m = allModels.find((m) => m.name === col.modelName);
@@ -525,6 +587,19 @@ export default function Chat() {
           onChange={(e) => patchParams(col.id, { contextLimit: parseInt(e.target.value) || 0 })}
           style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg)", fontSize: 13 }} />
       </label>
+
+      {/* Disable Thinking (Anthropic only) */}
+      {col.protocol === "anthropic" && (
+        <label style={{ ...labelStyle, flexDirection: "row", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
+          <span>
+            No thinking
+            <span style={{ color: "var(--text-muted)", fontSize: 11, marginLeft: 4 }}>Anthropic</span>
+          </span>
+          <input type="checkbox" checked={col.params.disableThinking}
+            onChange={(e) => patchParams(col.id, { disableThinking: e.target.checked })}
+            style={{ accentColor: "var(--accent)", width: 15, height: 15, cursor: "pointer" }} />
+        </label>
+      )}
 
       {/* System prompt */}
       <label style={labelStyle}>
@@ -619,6 +694,8 @@ export default function Chat() {
             <button
               onClick={() => {
                 if (!confirm("Clear all conversations?")) return;
+                const allIds = conversations.flatMap(collectAttachmentIds);
+                deleteAttachments(allIds).catch(console.error);
                 writeStore([]);
                 setConversations([]);
                 newChat();
@@ -787,29 +864,29 @@ export default function Chat() {
           {/* Attachment thumbnails */}
           {attachments.length > 0 && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-              {attachments.map((part, i) => (
-                <div key={i} style={{ position: "relative", flexShrink: 0 }}>
-                  {part.type === "image_url" ? (
-                    <img src={part.image_url.url} alt="" style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)", display: "block" }} />
-                  ) : part.type === "input_audio" ? (
+              {(attachments.filter((a) => a.type === "attachment_ref") as ContentPartRef[]).map((ref, i) => (
+                <div key={ref.id} style={{ position: "relative", flexShrink: 0 }}>
+                  {ref.category === "image" ? (
+                    <img src={ref.previewUrl} alt="" style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)", display: "block" }} />
+                  ) : ref.category === "audio" ? (
                     <div style={{ width: 120, height: 60, borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2, rgba(0,0,0,0.06))", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>
                       <span style={{ fontSize: 20 }}>🎵</span>
-                      <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{part.input_audio.format.toUpperCase()}</span>
+                      <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{ref.mimeType.split("/")[1].toUpperCase()}</span>
                     </div>
-                  ) : part.type === "document" ? (
-                    <div style={{ width: 120, height: 60, borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2, rgba(0,0,0,0.06))", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, padding: "0 6px" }}>
-                      <span style={{ fontSize: 18 }}>{part.document.mimeType === "application/pdf" ? "📄" : "📝"}</span>
-                      <span style={{ fontSize: 9, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%", textAlign: "center" }}>{part.document.name}</span>
-                    </div>
+                  ) : ref.category === "video" ? (
+                    <video src={ref.previewUrl} muted style={{ width: 80, height: 60, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)", display: "block" }} />
                   ) : (
-                    <video
-                      src={(part as { video_url: { url: string } }).video_url.url}
-                      muted
-                      style={{ width: 80, height: 60, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)", display: "block" }}
-                    />
+                    <div style={{ width: 120, height: 60, borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2, rgba(0,0,0,0.06))", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, padding: "0 6px" }}>
+                      <span style={{ fontSize: 18 }}>{ref.mimeType === "application/pdf" ? "📄" : "📝"}</span>
+                      <span style={{ fontSize: 9, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%", textAlign: "center" }}>{ref.name}</span>
+                    </div>
                   )}
                   <button
-                    onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                    onClick={() => {
+                      if (ref.previewUrl) URL.revokeObjectURL(ref.previewUrl);
+                      deleteAttachments([ref.id]).catch(console.error);
+                      setAttachments((prev) => prev.filter((_, idx) => idx !== i));
+                    }}
                     style={{
                       position: "absolute", top: -6, right: -6,
                       width: 18, height: 18, borderRadius: "50%",

@@ -9,7 +9,7 @@ interface Props {
   onCancel: () => void;
 }
 
-interface ProviderPreset {
+export interface ProviderPreset {
   label: string;
   name: string;
   baseUrl: string;
@@ -20,7 +20,7 @@ interface ProviderPreset {
   noKey?: boolean; // no API key needed (e.g. Ollama)
 }
 
-const PRESETS: ProviderPreset[] = [
+export const PRESETS: ProviderPreset[] = [
   // ── Global ──────────────────────────────────────────────────────────────
   {
     label: "OpenAI",

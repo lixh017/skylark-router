@@ -108,6 +108,7 @@ func main() {
 		// API Keys
 		api.GET("/keys", handlers.ListAPIKeys)
 		api.POST("/keys", handlers.CreateAPIKey)
+		api.GET("/keys/:id/reveal", handlers.RevealAPIKey)
 		api.PUT("/keys/:id", handlers.UpdateAPIKey)
 		api.DELETE("/keys/:id", handlers.DeleteAPIKey)
 		api.POST("/keys/:id/reset-quota", handlers.ResetAPIKeyQuota)

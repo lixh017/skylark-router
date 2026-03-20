@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import type { APIKey } from "../types";
-import { listAPIKeys, createAPIKey, updateAPIKey, deleteAPIKey, resetAPIKeyQuota } from "../api/client";
+import { listAPIKeys, createAPIKey, updateAPIKey, deleteAPIKey, resetAPIKeyQuota, revealAPIKey } from "../api/client";
 import { useI18n } from "../i18n";
 import { useToast } from "./ui/Toast";
 import { useConfirm } from "./ui/ConfirmModal";
@@ -19,6 +19,20 @@ export default function APIKeyList() {
   const [editName, setEditName] = useState("");
   const [editRateLimit, setEditRateLimit] = useState(0);
   const [editQuotaTotal, setEditQuotaTotal] = useState(0);
+  const [revealedKeys, setRevealedKeys] = useState<Record<number, string>>({});
+
+  const handleReveal = async (id: number) => {
+    if (revealedKeys[id]) {
+      setRevealedKeys((prev) => { const n = { ...prev }; delete n[id]; return n; });
+      return;
+    }
+    try {
+      const { key } = await revealAPIKey(id);
+      setRevealedKeys((prev) => ({ ...prev, [id]: key }));
+    } catch (e) {
+      toast("获取 Key 失败：" + (e as Error).message, "error");
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -169,7 +183,28 @@ export default function APIKeyList() {
                       style={{ padding: "4px 8px", border: "1px solid var(--border)", borderRadius: 4, width: 120, background: "var(--bg)", color: "var(--text)" }} />
                   ) : k.name}
                 </td>
-                <td style={{ padding: "8px 12px", fontFamily: "monospace", color: "var(--text-muted)" }}>{k.key_suffix}</td>
+                <td style={{ padding: "8px 12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontFamily: "monospace", color: "var(--text-muted)", fontSize: 13, wordBreak: "break-all" }}>
+                      {revealedKeys[k.id] ?? k.key_suffix}
+                    </span>
+                    <button
+                      onClick={() => handleReveal(k.id)}
+                      title={revealedKeys[k.id] ? "隐藏" : "查看完整 Key"}
+                      style={{ flexShrink: 0, padding: "2px 6px", cursor: "pointer", border: "1px solid var(--border)", borderRadius: 4, background: "var(--surface)", color: "var(--text-muted)", fontSize: 12 }}
+                    >
+                      {revealedKeys[k.id] ? "隐藏" : "👁"}
+                    </button>
+                    {revealedKeys[k.id] && (
+                      <button
+                        onClick={() => navigator.clipboard.writeText(revealedKeys[k.id])}
+                        style={{ flexShrink: 0, padding: "2px 6px", cursor: "pointer", border: "1px solid var(--border)", borderRadius: 4, background: "var(--surface)", color: "var(--text-muted)", fontSize: 12 }}
+                      >
+                        复制
+                      </button>
+                    )}
+                  </div>
+                </td>
                 <td style={{ padding: "8px 12px" }}>
                   <button onClick={() => handleToggle(k)} style={{
                     padding: "2px 10px", border: "1px solid", borderRadius: 4, cursor: "pointer",
