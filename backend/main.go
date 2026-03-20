@@ -124,6 +124,9 @@ func main() {
 		// Config
 		api.GET("/config", handlers.GetConfig)
 		api.PUT("/config", handlers.UpdateConfig)
+
+		// Web search proxy
+		api.GET("/search", handlers.Search)
 	}
 
 	// Serve embedded frontend if available

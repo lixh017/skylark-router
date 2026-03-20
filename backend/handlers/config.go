@@ -9,12 +9,14 @@ import (
 )
 
 type configResponse struct {
-	Host         string `json:"host"`
-	Port         string `json:"port"`
-	DBPath       string `json:"db_path"`
-	AuthToken    string `json:"auth_token"`
-	LogRequests  bool   `json:"log_requests"`
-	DefaultModel string `json:"default_model"`
+	Host           string `json:"host"`
+	Port           string `json:"port"`
+	DBPath         string `json:"db_path"`
+	AuthToken      string `json:"auth_token"`
+	LogRequests    bool   `json:"log_requests"`
+	DefaultModel   string `json:"default_model"`
+	SearchProvider string `json:"search_provider"`
+	SearchAPIKey   string `json:"search_api_key"`
 }
 
 // maskToken returns "****<last4>" if len>4, otherwise all stars.
@@ -35,21 +37,25 @@ func GetConfig(c *gin.Context) {
 	config.Mu.RUnlock()
 
 	c.JSON(http.StatusOK, configResponse{
-		Host:         cfg.Host,
-		Port:         cfg.Port,
-		DBPath:       cfg.DBPath,
-		AuthToken:    maskToken(cfg.AuthToken),
-		LogRequests:  cfg.LogRequests,
-		DefaultModel: cfg.DefaultModel,
+		Host:           cfg.Host,
+		Port:           cfg.Port,
+		DBPath:         cfg.DBPath,
+		AuthToken:      maskToken(cfg.AuthToken),
+		LogRequests:    cfg.LogRequests,
+		DefaultModel:   cfg.DefaultModel,
+		SearchProvider: cfg.SearchProvider,
+		SearchAPIKey:   maskToken(cfg.SearchAPIKey),
 	})
 }
 
 type configUpdateRequest struct {
-	Host         *string `json:"host"`
-	Port         *string `json:"port"`
-	AuthToken    *string `json:"auth_token"`
-	LogRequests  *bool   `json:"log_requests"`
-	DefaultModel *string `json:"default_model"`
+	Host           *string `json:"host"`
+	Port           *string `json:"port"`
+	AuthToken      *string `json:"auth_token"`
+	LogRequests    *bool   `json:"log_requests"`
+	DefaultModel   *string `json:"default_model"`
+	SearchProvider *string `json:"search_provider"`
+	SearchAPIKey   *string `json:"search_api_key"`
 }
 
 type configUpdateResponse struct {
@@ -97,6 +103,16 @@ func UpdateConfig(c *gin.Context) {
 	// Default model
 	if req.DefaultModel != nil {
 		cfg.DefaultModel = *req.DefaultModel
+	}
+
+	// Search provider (hot-reload)
+	if req.SearchProvider != nil {
+		cfg.SearchProvider = *req.SearchProvider
+	}
+
+	// Search API key (hot-reload)
+	if req.SearchAPIKey != nil {
+		cfg.SearchAPIKey = *req.SearchAPIKey
 	}
 
 	// Persist to disk

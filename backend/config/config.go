@@ -17,22 +17,26 @@ import (
 var Mu sync.RWMutex
 
 type Config struct {
-	Host         string
-	Port         string
-	DBPath       string
-	AuthToken    string
-	LogRequests  bool
-	DefaultModel string
+	Host           string
+	Port           string
+	DBPath         string
+	AuthToken      string
+	LogRequests    bool
+	DefaultModel   string
+	SearchProvider string // "tavily" or "serper"
+	SearchAPIKey   string
 }
 
 // fileConfig mirrors Config but uses yaml tags for user-friendly config file
 type fileConfig struct {
-	Host         string `yaml:"host"`
-	Port         string `yaml:"port"`
-	DBPath       string `yaml:"db_path"`
-	AuthToken    string `yaml:"auth_token"`
-	LogRequests  bool   `yaml:"log_requests"`
-	DefaultModel string `yaml:"default_model"`
+	Host           string `yaml:"host"`
+	Port           string `yaml:"port"`
+	DBPath         string `yaml:"db_path"`
+	AuthToken      string `yaml:"auth_token"`
+	LogRequests    bool   `yaml:"log_requests"`
+	DefaultModel   string `yaml:"default_model"`
+	SearchProvider string `yaml:"search_provider"`
+	SearchAPIKey   string `yaml:"search_api_key"`
 }
 
 var C *Config
@@ -129,6 +133,12 @@ func Load() *Config {
 	if v := os.Getenv("DEFAULT_MODEL"); v != "" {
 		fc.DefaultModel = v
 	}
+	if v := os.Getenv("SEARCH_PROVIDER"); v != "" {
+		fc.SearchProvider = v
+	}
+	if v := os.Getenv("SEARCH_API_KEY"); v != "" {
+		fc.SearchAPIKey = v
+	}
 
 	// Resolve db_path relative to binary dir (not cwd) on non-dev builds
 	if !filepath.IsAbs(fc.DBPath) {
@@ -139,12 +149,14 @@ func Load() *Config {
 	}
 
 	C = &Config{
-		Host:         fc.Host,
-		Port:         fc.Port,
-		DBPath:       fc.DBPath,
-		AuthToken:    fc.AuthToken,
-		LogRequests:  fc.LogRequests,
-		DefaultModel: fc.DefaultModel,
+		Host:           fc.Host,
+		Port:           fc.Port,
+		DBPath:         fc.DBPath,
+		AuthToken:      fc.AuthToken,
+		LogRequests:    fc.LogRequests,
+		DefaultModel:   fc.DefaultModel,
+		SearchProvider: fc.SearchProvider,
+		SearchAPIKey:   fc.SearchAPIKey,
 	}
 
 	log.Printf("Config loaded from %s (host=%s, port=%s, db=%s, default_model=%q, log_requests=%v)",
@@ -190,6 +202,10 @@ default_model: "{{.DefaultModel}}"
 
 # Set to true to log full request/response bodies (for debugging)
 log_requests: {{.LogRequests}}
+
+# Web search integration: "tavily" or "serper"
+search_provider: "{{.SearchProvider}}"
+search_api_key: "{{.SearchAPIKey}}"
 `))
 
 // Save writes the current config to disk atomically (write tmp, then rename).

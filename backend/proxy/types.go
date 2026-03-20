@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"skylark-router/router"
@@ -135,12 +136,21 @@ func DetectAnthropicRequirements(req *AnthropicRequest) Requirements {
 	// Check for multimodal content blocks
 	for _, msg := range req.Messages {
 		var blocks []struct {
-			Type string `json:"type"`
+			Type   string `json:"type"`
+			Source struct {
+				MediaType string `json:"media_type"`
+			} `json:"source"`
 		}
 		if json.Unmarshal(msg.Content, &blocks) == nil {
 			for _, b := range blocks {
 				if b.Type == "image" {
 					reqs.NeedsInputImage = true
+				}
+				if b.Type == "document" && strings.HasPrefix(b.Source.MediaType, "audio/") {
+					reqs.NeedsInputAudio = true
+				}
+				if b.Type == "video" {
+					reqs.NeedsInputVideo = true
 				}
 			}
 		}
@@ -172,6 +182,124 @@ func getContentText(raw json.RawMessage) string {
 	return ""
 }
 
+// convertOpenAIContentToAnthropic converts OpenAI content parts to Anthropic format
+func convertOpenAIContentToAnthropic(raw json.RawMessage) json.RawMessage {
+	// If it's a plain string, return as-is
+	var str string
+	if json.Unmarshal(raw, &str) == nil {
+		return raw
+	}
+
+	// Parse as array of parts
+	var parts []json.RawMessage
+	if json.Unmarshal(raw, &parts) != nil {
+		return raw
+	}
+
+	type partType struct {
+		Type string `json:"type"`
+	}
+	type imageURLPart struct {
+		Type     string `json:"type"`
+		ImageURL struct {
+			URL string `json:"url"`
+		} `json:"image_url"`
+	}
+	type inputAudioPart struct {
+		Type       string `json:"type"`
+		InputAudio struct {
+			Data   string `json:"data"`
+			Format string `json:"format"`
+		} `json:"input_audio"`
+	}
+	type videoURLPart struct {
+		Type     string `json:"type"`
+		VideoURL struct {
+			URL      string `json:"url"`
+			MimeType string `json:"mime_type"`
+		} `json:"video_url"`
+	}
+
+	extractBase64 := func(dataURL string) string {
+		idx := strings.Index(dataURL, ",")
+		if idx == -1 {
+			return dataURL
+		}
+		return dataURL[idx+1:]
+	}
+	extractMimeType := func(dataURL string) string {
+		// data:image/jpeg;base64,...
+		if len(dataURL) > 5 && dataURL[:5] == "data:" {
+			end := strings.Index(dataURL, ";")
+			if end != -1 {
+				return dataURL[5:end]
+			}
+		}
+		return "image/jpeg"
+	}
+
+	converted := make([]interface{}, 0, len(parts))
+	for _, p := range parts {
+		var pt partType
+		if json.Unmarshal(p, &pt) != nil {
+			converted = append(converted, p)
+			continue
+		}
+		switch pt.Type {
+		case "image_url":
+			var img imageURLPart
+			if json.Unmarshal(p, &img) == nil {
+				converted = append(converted, map[string]interface{}{
+					"type": "image",
+					"source": map[string]interface{}{
+						"type":       "base64",
+						"media_type": extractMimeType(img.ImageURL.URL),
+						"data":       extractBase64(img.ImageURL.URL),
+					},
+				})
+			} else {
+				converted = append(converted, p)
+			}
+		case "input_audio":
+			var audio inputAudioPart
+			if json.Unmarshal(p, &audio) == nil {
+				converted = append(converted, map[string]interface{}{
+					"type": "document",
+					"source": map[string]interface{}{
+						"type":       "base64",
+						"media_type": "audio/" + audio.InputAudio.Format,
+						"data":       audio.InputAudio.Data,
+					},
+				})
+			} else {
+				converted = append(converted, p)
+			}
+		case "video_url":
+			var vid videoURLPart
+			if json.Unmarshal(p, &vid) == nil {
+				converted = append(converted, map[string]interface{}{
+					"type": "video",
+					"source": map[string]interface{}{
+						"type":       "base64",
+						"media_type": vid.VideoURL.MimeType,
+						"data":       extractBase64(vid.VideoURL.URL),
+					},
+				})
+			} else {
+				converted = append(converted, p)
+			}
+		default:
+			converted = append(converted, p)
+		}
+	}
+
+	result, err := json.Marshal(converted)
+	if err != nil {
+		return raw
+	}
+	return result
+}
+
 // OpenAIToAnthropic converts an OpenAI chat request to Anthropic format
 func OpenAIToAnthropic(req OpenAIChatRequest) AnthropicRequest {
 	ar := AnthropicRequest{
@@ -195,7 +323,7 @@ func OpenAIToAnthropic(req OpenAIChatRequest) AnthropicRequest {
 		}
 		ar.Messages = append(ar.Messages, AnthropicMessage{
 			Role:    msg.Role,
-			Content: msg.Content,
+			Content: convertOpenAIContentToAnthropic(msg.Content),
 		})
 	}
 
