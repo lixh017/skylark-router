@@ -21,13 +21,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Build frontend
         working-directory: frontend
-        run: npm install --ignore-scripts && npm run build
+        run: pnpm install --ignore-scripts && pnpm run build
 
       - name: Copy frontend dist into backend/static
         run: |
@@ -52,6 +56,10 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
       - uses: actions/setup-node@v4
         with:
@@ -78,14 +86,14 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm install --ignore-scripts
+        run: pnpm install --ignore-scripts
 
       - name: Build universal macOS DMG
         working-directory: frontend
         run: |
           VERSION_NUM="${VERSION#v}"
           python3 -c "import json; c=json.load(open('src-tauri/tauri.conf.json')); c['version']='${VERSION_NUM}'; json.dump(c,open('src-tauri/tauri.conf.json','w'),indent=2)"
-          npm run tauri:build:mac:universal:dmg
+          pnpm run tauri:build:mac:universal:dmg
         env:
           VERSION: ${{ github.ref_name }}
 
@@ -110,6 +118,10 @@ jobs:
             librsvg2-dev \
             patchelf \
             squashfs-tools
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
       - uses: actions/setup-node@v4
         with:
@@ -136,7 +148,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm install --ignore-scripts
+        run: pnpm install --ignore-scripts
 
       - name: Build Linux bundle
         working-directory: frontend
@@ -160,6 +172,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
       - uses: actions/setup-node@v4
         with:
@@ -187,7 +203,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm install --ignore-scripts
+        run: pnpm install --ignore-scripts
 
       - name: Build Windows bundle
         working-directory: frontend
