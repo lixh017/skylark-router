@@ -119,7 +119,7 @@ const IconGlobe = () => (
 /* ── Component ── */
 export default function Chat() {
   const { t } = useI18n();
-  const { toast } = useToast();
+  const toast = useToast();
   const [allModels, setAllModels] = useState<Model[]>([]);
   const modelNames = useMemo(() => [...new Set(allModels.map((m) => m.name))].sort(), [allModels]);
   const [columns, setColumns] = useState<Column[]>([]);

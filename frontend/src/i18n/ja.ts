@@ -174,8 +174,8 @@ const ja: Translations = {
   docsModelDefault: "model 省略 — config の default_model にフォールバック",
   docsFeatures: "主な機能",
   docsFeaturesList: "同名モデルの複数ルートで加重負荷分散|自動フェイルオーバー — 失敗時に次のプロバイダーへ自動切替|キーごとのレート制限（リクエスト/分）とトークンクォータ|リクエスト/レスポンスログ（log_requests: true で有効化）|OpenAI・Anthropic プロトコル対応、自動変換",
-  docsCursorTitle: "Cursor などのツールで使用",
-  docsCursorDesc: "ツールの設定で OpenAI Base URL と API Key を入力してください：",
+  docsIntegrationsTitle: "クライアント連携",
+  docsIntegrationsDesc: "人気ツールをこのゲートウェイに接続する方法：",
 
   tabSettings: "設定",
   settingsServer: "サーバー",

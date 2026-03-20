@@ -136,9 +136,12 @@ export const getTimeseries = (since?: string, interval?: string) => {
 // Chat - OpenAI format streaming
 export async function* streamChatOpenAI(req: ChatRequest, signal?: AbortSignal): AsyncGenerator<string> {
   const origin = await getBackendOrigin();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = getAdminToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${origin}/v1/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ ...req, stream: true }),
     signal,
   });
@@ -223,9 +226,12 @@ export async function* streamChatAnthropic(req: ChatRequest, signal?: AbortSigna
   if (req.disable_thinking) body.thinking = { type: "disabled" };
 
   const origin = await getBackendOrigin();
+  const headers: Record<string, string> = { "Content-Type": "application/json", "anthropic-version": "2023-06-01" };
+  const token = getAdminToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${origin}/v1/messages`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01" },
+    headers,
     body: JSON.stringify(body),
     signal,
   });

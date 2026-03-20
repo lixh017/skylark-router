@@ -174,8 +174,8 @@ const de: Translations = {
   docsModelDefault: "Ohne Modell — fällt auf default_model in der Konfiguration zurück",
   docsFeatures: "Funktionen",
   docsFeaturesList: "Gewichtete Lastverteilung zwischen Anbietern desselben Modells|Automatisches Failover — versucht bei Fehler den nächsten Anbieter|Ratenbegrenzung pro Schlüssel (Anfragen/Min.) und Token-Kontingent|Anfrage-/Antwort-Protokollierung (mit log_requests: true aktivieren)|OpenAI- und Anthropic-Protokoll mit automatischer Konvertierung",
-  docsCursorTitle: "Verwendung mit Cursor / anderen Tools",
-  docsCursorDesc: "Stellen Sie in Ihren Tool-Einstellungen die OpenAI Base URL und den API Key ein:",
+  docsIntegrationsTitle: "Client-Integrationen",
+  docsIntegrationsDesc: "So verbinden Sie gängige Tools mit diesem Gateway:",
 
   tabSettings: "Einstellungen",
   settingsServer: "Server",

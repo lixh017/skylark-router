@@ -174,8 +174,8 @@ const zh: Translations = {
   docsModelDefault: "不传 model — 回落到 config 中的 default_model",
   docsFeatures: "核心功能",
   docsFeaturesList: "同名模型多路由加权负载均衡|自动故障转移 — 失败时自动切换下一个服务商|Per-key 限流（请求/分钟）和 Token 配额|请求/响应日志记录（log_requests: true 开启）|OpenAI 和 Anthropic 协议支持，自动转换",
-  docsCursorTitle: "在 Cursor 等工具中使用",
-  docsCursorDesc: "在工具设置中填入 OpenAI Base URL 和 API Key：",
+  docsIntegrationsTitle: "客户端集成",
+  docsIntegrationsDesc: "主流工具接入本网关的配置方式：",
 
   tabSettings: "设置",
   settingsServer: "服务器",

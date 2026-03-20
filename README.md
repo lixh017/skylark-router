@@ -84,7 +84,7 @@ chmod +x skylark-router-linux-amd64
 ./skylark-router-linux-amd64
 ```
 
-The dashboard opens automatically at `http://localhost:8080`.
+The dashboard opens automatically at `http://localhost:16898`.
 
 ### Build from source
 
@@ -111,13 +111,13 @@ docker compose up -d
 3. **Call the API**
 
 ```bash
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:16898/v1/chat/completions \
   -H "Authorization: Bearer YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
-Point any OpenAI-compatible client at `http://localhost:8080/v1`.
+Point any OpenAI-compatible client at `http://localhost:16898/v1`.
 
 ---
 
@@ -126,6 +126,7 @@ Point any OpenAI-compatible client at `http://localhost:8080/v1`.
 | Document | Description |
 |----------|-------------|
 | [`docs/getting-started.md`](docs/getting-started.md) | Full setup walkthrough |
+| [`docs/integrations.md`](docs/integrations.md) | Cursor, Claude Code, Codex, Trae, OpenClaw, Cline, LobeChat, Open WebUI, Python, Node.js … |
 | [`docs/desktop-app.md`](docs/desktop-app.md) | Desktop app build and usage |
 | [`docs/routing.md`](docs/routing.md) | Providers, model routing, load balancing |
 | [`docs/chat-ui.md`](docs/chat-ui.md) | Chat UI features and keyboard shortcuts |
@@ -186,13 +187,13 @@ MIT — see [LICENSE](LICENSE)
 ./skylark-router-linux-amd64    # Linux x86_64
 ```
 
-启动后自动打开 `http://localhost:8080` 管理面板。
+启动后自动打开 `http://localhost:16898` 管理面板。
 
 **基本流程：**
 
 1. **Providers（提供商）** — 添加 OpenAI、DeepSeek、SiliconFlow 等服务商
 2. **Models（模型）** — 设置模型映射，同一个外部名可配置多个路由实现负载均衡和故障转移
 3. **API Keys（可选）** — 为不同应用创建独立密钥并设置限流/配额
-4. 将你的应用 `base_url` 改为 `http://localhost:8080/v1`
+4. 将你的应用 `base_url` 改为 `http://localhost:16898/v1`
 
 详细文档见 [`docs/`](docs/) 目录。

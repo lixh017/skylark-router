@@ -174,8 +174,8 @@ const ko: Translations = {
   docsModelDefault: "model 생략 — config의 default_model로 폴백",
   docsFeatures: "주요 기능",
   docsFeaturesList: "동일 모델의 다중 라우트 가중 부하 분산|자동 장애 조치 — 실패 시 다음 공급자로 자동 전환|키별 속도 제한(요청/분) 및 토큰 할당량|요청/응답 로깅(log_requests: true로 활성화)|OpenAI 및 Anthropic 프로토콜 지원, 자동 변환",
-  docsCursorTitle: "Cursor 등 도구에서 사용",
-  docsCursorDesc: "도구 설정에서 OpenAI Base URL과 API Key를 입력하세요:",
+  docsIntegrationsTitle: "클라이언트 통합",
+  docsIntegrationsDesc: "주요 도구를 이 게이트웨이에 연결하는 방법:",
 
   tabSettings: "설정",
   settingsServer: "서버",

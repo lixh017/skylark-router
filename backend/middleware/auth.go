@@ -31,6 +31,12 @@ func ProxyAuth() gin.HandlerFunc {
 			return
 		}
 
+		// Admin token also grants proxy access (e.g. built-in Chat UI)
+		if adminToken := config.C.AuthToken; adminToken != "" && key == adminToken {
+			c.Next()
+			return
+		}
+
 		var apiKey models.APIKey
 		if err := database.DB.Where("key = ? AND enabled = ?", key, true).First(&apiKey).Error; err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{

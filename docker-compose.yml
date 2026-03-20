@@ -2,11 +2,11 @@ services:
   skylark-router:
     build: .
     ports:
-      - "${PORT:-8080}:8080"
+      - "${PORT:-16898}:16898"
     volumes:
       - skylark-router-data:/app/data
     environment:
-      - PORT=8080
+      - PORT=16898
       - DB_PATH=/app/data/skylark-router.db
       - AUTH_TOKEN=${AUTH_TOKEN:-}
       - LOG_REQUESTS=${LOG_REQUESTS:-false}

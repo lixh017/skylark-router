@@ -19,7 +19,7 @@ chmod +x skylark-router-darwin-arm64
 ./skylark-router-darwin-arm64
 ```
 
-The dashboard opens automatically at `http://localhost:8080`.
+The dashboard opens automatically at `http://localhost:16898`.
 
 ### Docker
 
@@ -79,7 +79,7 @@ In the Providers list, click **Test** on your provider. A green result with late
 ### Cursor / VS Code / any OpenAI-compatible tool
 
 Set:
-- **Base URL**: `http://localhost:8080/v1`
+- **Base URL**: `http://localhost:16898/v1`
 - **API Key**: any string (or a key from the API Keys tab)
 
 ### Python
@@ -88,7 +88,7 @@ Set:
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:8080/v1",
+    base_url="http://localhost:16898/v1",
     api_key="sk-your-router-key",
 )
 
@@ -102,7 +102,7 @@ print(response.choices[0].message.content)
 ### cURL
 
 ```bash
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:16898/v1/chat/completions \
   -H "Authorization: Bearer sk-your-key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -123,6 +123,7 @@ If no keys are configured, all proxy requests pass through without authenticatio
 
 ## Next steps
 
+- [`integrations.md`](integrations.md) — Cursor, Claude Code, Codex CLI, Trae, Cline, LobeChat, Python, Node.js …
 - [`routing.md`](routing.md) — understand auto routing, load balancing, failover
 - [`chat-ui.md`](chat-ui.md) — use the built-in Chat UI
 - [`configuration.md`](configuration.md) — configure host, port, auth token

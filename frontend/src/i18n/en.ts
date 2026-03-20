@@ -194,8 +194,8 @@ const en = {
   docsModelDefault: "Omit model — falls back to the default_model in config",
   docsFeatures: "Features",
   docsFeaturesList: "Weighted load balancing across providers with the same model name|Automatic failover — retries next provider on failure|Per-key rate limiting (req/min) and token quota|Request/response logging (enable with log_requests: true)|OpenAI & Anthropic protocol support with automatic conversion",
-  docsCursorTitle: "Use with Cursor / other tools",
-  docsCursorDesc: "In your tool's settings, set the OpenAI base URL and API key:",
+  docsIntegrationsTitle: "Client Integrations",
+  docsIntegrationsDesc: "How to connect popular tools to this gateway:",
 
   // Settings
   tabSettings: "Settings",

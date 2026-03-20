@@ -22,7 +22,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
   const { t } = useI18n();
   const [step, setStep] = useState<Step>("welcome");
   const [host, setHost] = useState("0.0.0.0");
-  const [port, setPort] = useState("8080");
+  const [port, setPort] = useState("16898");
   const [authToken, setAuthToken] = useState("");
   const [defaultModel, setDefaultModel] = useState("");
   const [logRequests, setLogRequests] = useState(false);

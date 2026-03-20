@@ -15,7 +15,7 @@ Skylark Router is configured via `config.yaml` (created automatically on first r
 host: "0.0.0.0"
 
 # HTTP listen port
-port: "8080"
+port: "16898"
 
 # SQLite database path (relative to binary, or absolute)
 db_path: "skylark-router.db"
@@ -46,7 +46,7 @@ search_api_key: ""
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `HOST` | `0.0.0.0` | Bind address |
-| `PORT` | `8080` | Listen port |
+| `PORT` | `16898` | Listen port |
 | `DB_PATH` | `skylark-router.db` | SQLite database path |
 | `AUTH_TOKEN` | _(none)_ | Admin dashboard token |
 | `DEFAULT_MODEL` | _(none)_ | Default model for requests without a model field |
@@ -81,7 +81,7 @@ services:
   skylark-router:
     image: skylark-router
     ports:
-      - "8080:8080"
+      - "16898:16898"
     environment:
       AUTH_TOKEN: "your-secret-token"
       LOG_REQUESTS: "false"

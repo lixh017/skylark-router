@@ -67,7 +67,7 @@ var defaultConfigTemplate = `# Skylark Router Configuration
 host: "0.0.0.0"
 
 # Port to listen on
-port: "8080"
+port: "16898"
 
 # Path to the SQLite database file
 # Relative paths are resolved from the binary's directory
@@ -105,7 +105,7 @@ func Load() *Config {
 	// Load config file
 	fc := fileConfig{
 		Host:   "0.0.0.0",
-		Port:   "8080",
+		Port:   "16898",
 		DBPath: "skylark-router.db",
 	}
 	if data, err := os.ReadFile(cfgPath); err == nil {

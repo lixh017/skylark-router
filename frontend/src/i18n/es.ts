@@ -174,8 +174,8 @@ const es: Translations = {
   docsModelDefault: "Sin modelo — recurre al default_model en la configuración",
   docsFeatures: "Características",
   docsFeaturesList: "Balanceo de carga ponderado entre proveedores del mismo modelo|Failover automático — reintenta con el siguiente proveedor en caso de fallo|Límite de tasa por clave (req/min) y cuota de tokens|Registro de solicitudes/respuestas (activar con log_requests: true)|Soporte de protocolos OpenAI y Anthropic con conversión automática",
-  docsCursorTitle: "Usar con Cursor / otras herramientas",
-  docsCursorDesc: "En la configuración de su herramienta, establezca la URL base de OpenAI y la clave API:",
+  docsIntegrationsTitle: "Integraciones de clientes",
+  docsIntegrationsDesc: "Cómo conectar herramientas populares a esta pasarela:",
 
   tabSettings: "Configuración",
   settingsServer: "Servidor",
