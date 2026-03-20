@@ -14,7 +14,7 @@ struct SidecarState(Mutex<Option<CommandChild>>);
 static BACKEND_PORT: Mutex<Option<u16>> = Mutex::new(None);
 
 /// Read the configured port from config.yaml at the given path.
-/// Falls back to 8080 (the Go default) if the file is missing or unparseable.
+/// Falls back to 16898 (the default) if the file is missing or unparseable.
 fn read_config_port(config_path: &std::path::Path) -> u16 {
     if let Ok(content) = std::fs::read_to_string(config_path) {
         for line in content.lines() {
@@ -27,7 +27,7 @@ fn read_config_port(config_path: &std::path::Path) -> u16 {
             }
         }
     }
-    8080
+    16898
 }
 
 /// Try to use the configured port. If it's already in use, fall back to any
@@ -79,7 +79,7 @@ fn spawn_sidecar(
 /// Tauri command: returns the port the backend sidecar is listening on.
 #[tauri::command]
 fn get_backend_port() -> u16 {
-    BACKEND_PORT.lock().unwrap().unwrap_or(8080)
+    BACKEND_PORT.lock().unwrap().unwrap_or(16898)
 }
 
 /// Tauri command: restart the Go sidecar (kill old, spawn new).
@@ -104,7 +104,7 @@ fn restart_sidecar(app: tauri::AppHandle) -> Result<u16, String> {
     let child = spawn_sidecar(&app, &cfg_path, &db_path).map_err(|e| e.to_string())?;
     *guard = Some(child);
 
-    let port = BACKEND_PORT.lock().unwrap().unwrap_or(8080);
+    let port = BACKEND_PORT.lock().unwrap().unwrap_or(16898);
     Ok(port)
 }
 
@@ -184,6 +184,7 @@ pub fn run() {
                     }
                     "show" => {
                         if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.unminimize();
                             let _ = window.show();
                             let _ = window.set_focus();
                         }
@@ -194,9 +195,12 @@ pub fn run() {
                     if let TrayIconEvent::Click { button: MouseButton::Left, .. } = event {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
-                            if window.is_visible().unwrap_or(false) {
+                            let is_visible = window.is_visible().unwrap_or(false);
+                            let is_minimized = window.is_minimized().unwrap_or(false);
+                            if is_visible && !is_minimized {
                                 let _ = window.hide();
                             } else {
+                                let _ = window.unminimize();
                                 let _ = window.show();
                                 let _ = window.set_focus();
                             }
