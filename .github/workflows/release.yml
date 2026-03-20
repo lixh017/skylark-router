@@ -27,7 +27,7 @@ jobs:
 
       - name: Build frontend
         working-directory: frontend
-        run: npm ci && npm run build
+        run: npm install --ignore-scripts && npm run build
 
       - name: Copy frontend dist into backend/static
         run: |
@@ -78,7 +78,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm install --ignore-scripts
 
       - name: Build universal macOS DMG
         working-directory: frontend
@@ -136,7 +136,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm install --ignore-scripts
 
       - name: Build Linux bundle
         working-directory: frontend
@@ -187,7 +187,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm install --ignore-scripts
 
       - name: Build Windows bundle
         working-directory: frontend
