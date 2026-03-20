@@ -13,7 +13,7 @@ RUST_TARGET   = $(shell rustc -vV 2>/dev/null | grep '^host:' | cut -d' ' -f2)
 SIDECAR_DIR   = frontend/src-tauri/binaries
 
 build:
-	cd frontend && npm ci && npm run build
+	cd frontend && pnpm install --ignore-scripts && pnpm run build
 	rm -rf backend/static/assets backend/static/index.html
 	cp -r frontend/dist/* backend/static/
 	cd backend && CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o ../skylark-router .
@@ -24,7 +24,7 @@ run: build
 dev:
 	@echo "Start backend and frontend dev servers separately:"
 	@echo "  cd backend && go run ."
-	@echo "  cd frontend && npm run dev"
+	@echo "  cd frontend && pnpm run dev"
 
 docker-build:
 	docker build --build-arg VERSION=$(VERSION) --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg BUILD_TIME=$(BUILD_TIME) -t skylark-router .
@@ -43,7 +43,7 @@ docker-stop:
 	docker compose down
 
 release: clean
-	cd frontend && npm ci && npm run build
+	cd frontend && pnpm install --ignore-scripts && pnpm run build
 	rm -rf backend/static/assets backend/static/index.html
 	cp -r frontend/dist/* backend/static/
 	@mkdir -p dist
@@ -79,15 +79,15 @@ tauri-sidecar:
 
 # Run Tauri in dev mode (hot-reload frontend + sidecar backend).
 tauri-dev: tauri-sidecar
-	cd frontend && npm install && npm run tauri:dev
+	cd frontend && pnpm install && pnpm run tauri:dev
 
 # Build the desktop app bundle for the current platform.
 tauri-build: tauri-sidecar
-	cd frontend && npm install && npm run tauri:build
+	cd frontend && pnpm install && pnpm run tauri:build
 
 # macOS: build a .dmg for the current architecture.
 tauri-build-dmg: tauri-sidecar
-	cd frontend && npm install && npm run tauri:build:mac:dmg
+	cd frontend && pnpm install && pnpm run tauri:build:mac:dmg
 
 # macOS: build a universal (arm64 + x86_64) .dmg.
 tauri-build-universal-dmg:
@@ -97,4 +97,4 @@ tauri-build-universal-dmg:
 	    -o ../$(SIDECAR_DIR)/skylark-router-x86_64-apple-darwin .
 	cd backend && CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "$(LDFLAGS)" \
 	    -o ../$(SIDECAR_DIR)/skylark-router-aarch64-apple-darwin .
-	cd frontend && npm install && npm run tauri:build:mac:universal:dmg
+	cd frontend && pnpm install && pnpm run tauri:build:mac:universal:dmg
