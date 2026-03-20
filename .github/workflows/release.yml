@@ -10,7 +10,7 @@ permissions:
   packages: write
 
 env:
-  GO_VERSION: '1.26'
+  GO_VERSION: '1.23'
   NODE_VERSION: '20'
 
 jobs:
@@ -70,6 +70,9 @@ jobs:
         with:
           workspaces: frontend/src-tauri
 
+      - name: Install create-dmg
+        run: brew install create-dmg
+
       - name: Build Go sidecar binaries (macOS amd64 + arm64)
         run: make tauri-sidecar VERSION=${{ github.ref_name }}
 
@@ -91,7 +94,7 @@ jobs:
   # ── 3. Desktop – Linux (.deb + .AppImage) ────────────────────────────
   desktop-linux:
     name: Desktop (Linux)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
